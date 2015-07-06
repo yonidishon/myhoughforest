@@ -14,8 +14,12 @@ x64/
 build/
 [Bb]in/
 [Oo]bj/
+<<<<<<< HEAD
 example/
 HoughForestGaze/
+=======
+
+>>>>>>> bfea6c7352486195d279a8c1f8538db630d80d2d
 # Enable "build/" folder in the NuGet Packages folder since NuGet packages use it for MSBuild targets
 !packages/*/build/
 
