@@ -396,9 +396,9 @@ void detect(CRForestDetector& crDetect) {
 
 		// Load image
 		IplImage *img = 0;
-		img = cvLoadImage((impath + "/" + vFilenames[i]).c_str(),CV_LOAD_IMAGE_COLOR);
+		img = cvLoadImage((vFilenames[i].c_str(),CV_LOAD_IMAGE_COLOR);
 		if(!img) {
-			cout << "Could not load image file: " << (impath + "/" + vFilenames[i]).c_str() << endl;
+			cout << "Could not load image file: " <<  vFilenames[i].c_str() << endl;
 			exit(-1);
 		}	
 
@@ -454,9 +454,9 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 
 			// Load image
 			IplImage *img = 0;
-			img = cvLoadImage((trainpospath + "/" + vFilenames[i]).c_str(),CV_LOAD_IMAGE_COLOR);
+			img = cvLoadImage(vFilenames[i].c_str(),CV_LOAD_IMAGE_COLOR);
 			if(!img) {
-				cout << "Could not load image file: " << (trainpospath + "/" + vFilenames[i]).c_str() << endl;
+				cout << "Could not load image file: " << vFilenames[i].c_str() << endl;
 				exit(-1);
 			}	
 
@@ -483,10 +483,10 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 
 			// Load image
 			IplImage *img = 0;
-			img = cvLoadImage((trainnegpath + "/" + vFilenames[i]).c_str(),CV_LOAD_IMAGE_COLOR);
+			img = cvLoadImage(vFilenames[i].c_str(),CV_LOAD_IMAGE_COLOR);
 
 			if(!img) {
-				cout << "Could not load image file: " << (trainnegpath + "/" + vFilenames[i]).c_str() << endl;
+				cout << "Could not load image file: " << vFilenames[i].c_str() << endl;
 				exit(-1);
 			}	
 
