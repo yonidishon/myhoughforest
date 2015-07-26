@@ -62,6 +62,8 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <Windows.h>
+#include "Shlwapi.h"
 #include <opencv2/highgui/highgui.hpp>
 
 #include "CRForestDetector.h"
@@ -110,6 +112,13 @@ unsigned int samples_neg;
 // offset for saving tree number
 int off_tree;
 
+BOOL DirectoryExists(LPCTSTR szPath)
+{
+	DWORD dwAttrib = GetFileAttributes(szPath);
+
+	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
+		(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
 
 // load config file for dataset
 void loadConfig(const char* filename, int mode) {
@@ -396,9 +405,9 @@ void detect(CRForestDetector& crDetect) {
 
 		// Load image
 		IplImage *img = 0;
-		img = cvLoadImage((vFilenames[i].c_str(),CV_LOAD_IMAGE_COLOR);
+		img = cvLoadImage(vFilenames[i].c_str(),CV_LOAD_IMAGE_COLOR);
 		if(!img) {
-			cout << "Could not load image file: " <<  vFilenames[i].c_str() << endl;
+			cout << "Could not load image file: " << (impath + "/" + vFilenames[i]).c_str() << endl;
 			exit(-1);
 		}	
 
@@ -415,13 +424,25 @@ void detect(CRForestDetector& crDetect) {
 
 		// Store result
 		string delimiter = ".";
-		string s = vFilenames[i].c_str();
-		string token = s.substr(0, s.find(delimiter));
+		string s = vFilenames[i].c_str(); 
+		string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+		size_t found = token.find_last_of("/\\");
+		string fname = token.substr(found + 1);//filename
+		string path = token.substr(0,found); //full path of image without filename
+		string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
+		string curfolder = outpath + "\\" + pfolder; //store path for detection
+		// Check if folder for result is exist and create if not
+		if (!DirectoryExists(curfolder.c_str())){
+			string execstr1 = "mkdir ";
+			execstr1 += curfolder;
+			system(execstr1.c_str());
+		}	
+		
 		for(unsigned int k=0;k<vImgDetect.size(); ++k) {
 			IplImage* tmp = cvCreateImage( cvSize(vImgDetect[k][0]->width,vImgDetect[k][0]->height) , IPL_DEPTH_8U , 1);
 			for(unsigned int c=0;c<vImgDetect[k].size(); ++c) {
 				cvConvertScale( vImgDetect[k][c], tmp, out_scale); //80 128
-				sprintf_s(buffer, "%s\\%s-%d_sc%d_c%d.png", outpath.c_str(), token.c_str(), k, c);
+				sprintf_s(buffer, "%s\\%s_sc%d_c%d_predmap.png", curfolder.c_str(), fname.c_str(), k, c);
 				cvSaveImage( buffer, tmp );
 				cvReleaseImage(&vImgDetect[k][c]);
 			}
@@ -454,8 +475,10 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 
 			// Load image
 			IplImage *img = 0;
-			img = cvLoadImage(vFilenames[i].c_str(),CV_LOAD_IMAGE_COLOR);
+			//img = cvLoadImage((trainpospath + "/" + vFilenames[i]).c_str(),CV_LOAD_IMAGE_COLOR);
+			img = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
 			if(!img) {
+				//cout << "Could not load image file: " << (trainpospath + "/" + vFilenames[i]).c_str() << endl;
 				cout << "Could not load image file: " << vFilenames[i].c_str() << endl;
 				exit(-1);
 			}	
@@ -486,7 +509,7 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 			img = cvLoadImage(vFilenames[i].c_str(),CV_LOAD_IMAGE_COLOR);
 
 			if(!img) {
-				cout << "Could not load image file: " << vFilenames[i].c_str() << endl;
+				cout << "Could not load image file: " << (trainnegpath + "/" + vFilenames[i]).c_str() << endl;
 				exit(-1);
 			}	
 
