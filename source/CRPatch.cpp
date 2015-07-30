@@ -11,7 +11,61 @@
 
 using namespace std;
 
-void CRPatch::extractPatches(IplImage *img, unsigned int n, int label, CvRect* box, std::vector<CvPoint>* vCenter) {
+void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n, int label, CvRect* box, std::vector<CvPoint>* vCenter) {
+	// extract features
+	vector<IplImage*> vImg;
+	//extractFeatureChannels(img, vImg);
+	vImg.resize(4);
+	for (unsigned int c = 0; c<vImg.size(); ++c)
+		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
+	vImg[0] = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
+	vImg[1] = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
+
+	CvMat tmp;
+	int offx = width / 2;
+	int offy = height / 2;
+
+	// generate x,y locations
+	CvMat* locations = cvCreateMat(n, 1, CV_32SC2);
+	if (box == 0)
+		cvRandArr(cvRNG, locations, CV_RAND_UNI, cvScalar(0, 0, 0, 0), cvScalar(img->width - width, img->height - height, 0, 0));
+	else
+		cvRandArr(cvRNG, locations, CV_RAND_UNI, cvScalar(box->x, box->y, 0, 0), cvScalar(box->x + box->width - width + 1, box->y + box->height - height + 1, 0, 0));
+
+	// reserve memory
+	unsigned int offset = vLPatches[label].size();
+	vLPatches[label].reserve(offset + n);
+	for (unsigned int i = 0; i<n; ++i) {
+		CvPoint pt = *(CvPoint*)cvPtr1D(locations, i, 0);
+
+		PatchFeature pf;
+		vLPatches[label].push_back(pf);
+
+		vLPatches[label].back().roi.x = pt.x;  vLPatches[label].back().roi.y = pt.y;
+		vLPatches[label].back().roi.width = width;  vLPatches[label].back().roi.height = height;
+
+		if (vCenter != 0) {
+			vLPatches[label].back().center.resize(vCenter->size());
+			for (unsigned int c = 0; c<vCenter->size(); ++c) {
+				vLPatches[label].back().center[c].x = pt.x + offx - (*vCenter)[c].x;
+				vLPatches[label].back().center[c].y = pt.y + offy - (*vCenter)[c].y;
+			}
+		}
+
+		vLPatches[label].back().vPatch.resize(vImg.size());
+		for (unsigned int c = 0; c<vImg.size(); ++c) {
+			cvGetSubRect(vImg[c], &tmp, vLPatches[label].back().roi);
+			vLPatches[label].back().vPatch[c] = cvCloneMat(&tmp);
+		}
+
+	}
+
+	cvReleaseMat(&locations);
+	for (unsigned int c = 0; c<vImg.size(); ++c)
+		cvReleaseImage(&vImg[c]);
+}
+
+void CRPatch::extractPatches_orig(IplImage *img, unsigned int n, int label, CvRect* box, std::vector<CvPoint>* vCenter) {
 	// extract features
 	vector<IplImage*> vImg;
 	extractFeatureChannels(img, vImg);

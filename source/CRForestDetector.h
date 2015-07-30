@@ -6,7 +6,7 @@
 #pragma once
 
 #include "CRForest.h"
-
+#include <ctime>
 
 class CRForestDetector {
 public:
