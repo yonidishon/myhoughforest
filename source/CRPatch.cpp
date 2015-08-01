@@ -18,8 +18,28 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 	vImg.resize(4);
 	for (unsigned int c = 0; c<vImg.size(); ++c)
 		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
-	vImg[0] = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
-	vImg[1] = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
+	string delimiter = ".";
+	string s = fullpath;
+	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+	size_t found = token.find_last_of("/\\");
+	string fname = token.substr(found + 1);//filename
+	string path = token.substr(0, found); //full path of image without filename
+	string pfolder = path.substr(path.find_last_of("/\\'")+1); //parent folder only
+	string rootpath = path.substr(0, path.find_last_of("/\\'"));
+	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
+	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
+	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+
+	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_COLOR);
+	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_COLOR);
+
+	// min filter
+	for (int c = 0; c<2; ++c)
+		minfilt(vImg[c], vImg[c + 2], 5);
+
+	//max filter
+	for (int c = 0; c<2; ++c)
+		maxfilt(vImg[c], 5);
 
 	CvMat tmp;
 	int offx = width / 2;

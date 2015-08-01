@@ -484,7 +484,7 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 			}	
 
 			// Extract positive training patches
-			Train.extractPatches(img, samples_pos, 1, &vBBox[i], &vCenter[i]); 
+			Train.extractPatches(img, vFilenames[i].c_str(), samples_pos, 1, &vBBox[i], &vCenter[i]);
 
 			// Release image
 			cvReleaseImage(&img);
@@ -515,9 +515,9 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 
 			// Extract negative training patches
 			if(vBBox.size()==vFilenames.size())
-				Train.extractPatches(img, samples_neg, 0, &vBBox[i]); 
+				Train.extractPatches(img, vFilenames[i].c_str(), samples_neg, 0, &vBBox[i]);
 			else
-				Train.extractPatches(img, samples_neg, 0); 
+				Train.extractPatches(img, vFilenames[i].c_str(), samples_neg, 0);
 
 			// Release image
 			cvReleaseImage(&img);

@@ -25,6 +25,13 @@
     <ClCompile Include="..\source\CRTree.cpp" />
     <ClCompile Include="..\source\HoG.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\source\CRForest.h" />
+    <ClInclude Include="..\source\CRForestDetector.h" />
+    <ClInclude Include="..\source\CRPatch.h" />
+    <ClInclude Include="..\source\CRTree.h" />
+    <ClInclude Include="..\source\HoG.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{F1B25E1B-A21E-4194-957D-8ED655ACDE41}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
@@ -55,7 +62,7 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v120</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
-    <CharacterSet>Unicode</CharacterSet>
+    <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -144,12 +151,15 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>C:\opencv30\build\install\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalLibraryDirectories>C:\opencv30\build\install\x64\vc12\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>opencv_core300.lib;opencv_highgui300.lib;opencv_imgcodecs300.lib;opencv_ml300.lib;opencv_imgproc300.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
