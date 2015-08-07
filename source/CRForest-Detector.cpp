@@ -562,9 +562,11 @@ void run_train() {
 	// Create directory
 	string tpath(treepath);
 	tpath.erase(tpath.find_last_of(PATH_SEP));
-	string execstr = "mkdir ";
-	execstr += tpath;
-	system( execstr.c_str() );
+	if (!DirectoryExists(tpath.c_str())){
+		string execstr = "mkdir ";
+		execstr += tpath;
+		system(execstr.c_str());
+	}
 
 	// Init training data
 	CRPatch Train(&cvRNG, p_width, p_height, 2); 
