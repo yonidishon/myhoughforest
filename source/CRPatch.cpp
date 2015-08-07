@@ -14,10 +14,10 @@ using namespace std;
 void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n, int label, CvRect* box, std::vector<CvPoint>* vCenter) {
 	// extract features
 	vector<IplImage*> vImg;
-	//extractFeatureChannels(img, vImg);
-	vImg.resize(4);
-	for (unsigned int c = 0; c<vImg.size(); ++c)
-		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
+	extractFeatureChannelsPartial(img, vImg);
+	//vImg.resize(4);
+	//for (unsigned int c = 0; c<vImg.size(); ++c)
+	//	vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
 	string delimiter = ".";
 	string s = fullpath;
 	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
@@ -34,11 +34,11 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_COLOR);
 
 	// min filter
-	for (int c = 0; c<2; ++c)
-		minfilt(vImg[c], vImg[c + 2], 5);
+	for (int c = 0; c<11; ++c)
+		minfilt(vImg[c], vImg[c + 11], 5);
 
 	//max filter
-	for (int c = 0; c<2; ++c)
+	for (int c = 0; c<11; ++c)
 		maxfilt(vImg[c], 5);
 
 	CvMat tmp;
@@ -256,6 +256,97 @@ void CRPatch::extractFeatureChannels(IplImage *img, std::vector<IplImage*>& vImg
 
 }
 
+void CRPatch::extractFeatureChannelsPartial(IplImage *img, std::vector<IplImage*>& vImg) {
+	// 18 feature channels + 4 features outside (PCAs , PCAm)x2
+	// 9 channels: HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
+	// 9+9 channels: minfilter + maxfilter on 5x5 neighborhood 
+	//    L   ,   a   ,   b   ,| I_x |,| I_y |, | I_xx | ,| I_yy |
+	// vImg[0],vImg[1],vImg[2],vImg[3],vImg[4],  vImg[5] ,vImg[6]
+	
+	vImg.resize(22);
+	// Initialize
+	for (unsigned int c = 0; c<vImg.size(); ++c)
+		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
+
+	// Get intensity
+	cvCvtColor(img, vImg[0], CV_RGB2GRAY);
+
+	// Temporary images for computing I_x, I_y (Avoid overflow for cvSobel)
+	IplImage* I_x = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_16S, 1);
+	IplImage* I_y = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_16S, 1);
+
+	// |I_x|, |I_y| Gradients Magnitudes
+	cvSobel(vImg[0], I_x, 1, 0, 3);
+	cvSobel(vImg[0], I_y, 0, 1, 3);
+
+	{
+		short* dataX;
+		short* dataY;
+		uchar* dataZ;
+		int stepX, stepY, stepZ;
+		CvSize size;
+		int x, y;
+
+		cvGetRawData(I_x, (uchar**)&dataX, &stepX, &size);
+		cvGetRawData(I_y, (uchar**)&dataY, &stepY);
+		cvGetRawData(vImg[0], (uchar**)&dataZ, &stepZ);
+		stepX /= sizeof(dataX[0]);
+		stepY /= sizeof(dataY[0]);
+		stepZ /= sizeof(dataZ[0]);
+
+		// Orientation of gradients
+		for (y = 0; y < size.height; y++, dataX += stepX, dataY += stepY, dataZ += stepZ)
+		for (x = 0; x < size.width; x++) {
+			// Avoid division by zero
+			float tx = (float)dataX[x] + (float)_copysign(0.000001f, (float)dataX[x]);
+			// Scaling [-pi/2 pi/2] -> [0 80*pi]
+			dataZ[x] = uchar((atan((float)dataY[x] / tx) + 3.14159265f / 2.0f) * 80);
+		}
+	}
+
+	{
+		short* dataX;
+		short* dataY;
+		uchar* dataZ;
+		int stepX, stepY, stepZ;
+		CvSize size;
+		int x, y;
+
+		cvGetRawData(I_x, (uchar**)&dataX, &stepX, &size);
+		cvGetRawData(I_y, (uchar**)&dataY, &stepY);
+		cvGetRawData(vImg[1], (uchar**)&dataZ, &stepZ);
+		stepX /= sizeof(dataX[0]);
+		stepY /= sizeof(dataY[0]);
+		stepZ /= sizeof(dataZ[0]);
+
+		// Magnitude of gradients
+		for (y = 0; y < size.height; y++, dataX += stepX, dataY += stepY, dataZ += stepZ)
+		for (x = 0; x < size.width; x++) {
+			dataZ[x] = (uchar)(sqrt((float)dataX[x] * (float)dataX[x] + (float)dataY[x] * (float)dataY[x]));
+		}
+	}
+
+	// 9-bin HOG feature stored at vImg[2] - vImg[11] 
+	hog.extractOBin(vImg[0], vImg[1], vImg, 2);
+#if 0
+	// for debugging only
+	char buffer[40];
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "out-%d.png", i);
+		cvNamedWindow(buffer, 1);
+		cvShowImage(buffer, vImg[i]);
+		//cvSaveImage( buffer, vImg[i] );
+	}
+
+	cvWaitKey();
+
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "%d", i);
+		cvDestroyWindow(buffer);
+	}
+#endif
+}
+
 void CRPatch::maxfilt(IplImage *src, unsigned int width) {
 
 	uchar* s_data;
@@ -336,7 +427,6 @@ void CRPatch::minfilt(IplImage *src, IplImage *dst, unsigned int width) {
 		minfilt(d_data+x, step, size.height, width);
 
 }
-
 
 void CRPatch::maxfilt(uchar* data, uchar* maxvalues, unsigned int step, unsigned int size, unsigned int width) {
 
