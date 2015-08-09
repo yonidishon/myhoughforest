@@ -10,11 +10,12 @@
 using namespace std;
 
 
-void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect, std::vector<float>& ratios) {
+void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect, std::vector<float>& ratios,const char* imfile) {
 
 	// extract features
 	vector<IplImage*> vImg;
-	CRPatch::extractFeatureChannels(img, vImg);
+	//CRPatch::extractFeatureChannels(img, vImg);
+	CRPatch::extractFeatureChannelsPartial(img, vImg,imfile); //TODO !!!!!!!!!
 
 	// reset output image
 	for(int c=0; c<(int)imgDetect.size(); ++c)
@@ -107,7 +108,7 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 
 }
 
-void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& vImgDetect, std::vector<float>& ratios) {	
+void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& vImgDetect, std::vector<float>& ratios,const char* imfile) {	
 
 	if(img->nChannels==1) {
 
@@ -123,7 +124,7 @@ void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& 
 			cvResize( img, cLevel, CV_INTER_LINEAR );	
 
 			// detection
-			detectColor(cLevel,vImgDetect[i],ratios);
+			detectColor(cLevel,vImgDetect[i],ratios,imfile);
 
 			cvReleaseImage(&cLevel);
 		}

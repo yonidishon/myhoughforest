@@ -14,13 +14,13 @@ public:
 	CRForestDetector(const CRForest* pRF, int w, int h) : crForest(pRF), width(w), height(h)  {}
 
 	// detect multi scale
-	void detectPyramid(IplImage *img, std::vector<std::vector<IplImage*> >& imgDetect, std::vector<float>& ratios);
+	void detectPyramid(IplImage *img, std::vector<std::vector<IplImage*> >& imgDetect, std::vector<float>& ratios,const char* imfile);
 
 	// Get/Set functions
 	unsigned int GetNumCenter() const {return crForest->GetNumCenter();}
 
 private:
-	void detectColor(IplImage *img, std::vector<IplImage*>& imgDetect, std::vector<float>& ratios);
+	void detectColor(IplImage *img, std::vector<IplImage*>& imgDetect, std::vector<float>& ratios, const char* imfile);
 
 	const CRForest* crForest;
 	int width;

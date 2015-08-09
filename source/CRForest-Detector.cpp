@@ -420,7 +420,7 @@ void detect(CRForestDetector& crDetect) {
 		}
 
 		// Detection for all scales
-		crDetect.detectPyramid(img, vImgDetect, ratios);
+		crDetect.detectPyramid(img, vImgDetect, ratios, vFilenames[i].c_str());
 
 		// Store result
 		string delimiter = ".";

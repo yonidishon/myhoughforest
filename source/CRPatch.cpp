@@ -14,33 +14,8 @@ using namespace std;
 void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n, int label, CvRect* box, std::vector<CvPoint>* vCenter) {
 	// extract features
 	vector<IplImage*> vImg;
-	extractFeatureChannelsPartial(img, vImg);
-	//vImg.resize(4);
-	//for (unsigned int c = 0; c<vImg.size(); ++c)
-	//	vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
-	string delimiter = ".";
-	string s = fullpath;
-	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
-	size_t found = token.find_last_of("/\\");
-	string fname = token.substr(found + 1);//filename
-	string path = token.substr(0, found); //full path of image without filename
-	string pfolder = path.substr(path.find_last_of("/\\'")+1); //parent folder only
-	string rootpath = path.substr(0, path.find_last_of("/\\'"));
-	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
-	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
-	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
-
-	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_COLOR);
-	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_COLOR);
-
-	// min filter
-	for (int c = 0; c<11; ++c)
-		minfilt(vImg[c], vImg[c + 11], 5);
-
-	//max filter
-	for (int c = 0; c<11; ++c)
-		maxfilt(vImg[c], 5);
-
+	extractFeatureChannelsPartial(img, vImg,fullpath);
+	
 	CvMat tmp;
 	int offx = width / 2;
 	int offy = height / 2;
@@ -256,8 +231,8 @@ void CRPatch::extractFeatureChannels(IplImage *img, std::vector<IplImage*>& vImg
 
 }
 
-void CRPatch::extractFeatureChannelsPartial(IplImage *img, std::vector<IplImage*>& vImg) {
-	// 18 feature channels + 4 features outside (PCAs , PCAm)x2
+void CRPatch::extractFeatureChannelsPartial(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath ) {
+	// 18 feature channels + 4 features (PCAs , PCAm)x2
 	// 9 channels: HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
 	// 9+9 channels: minfilter + maxfilter on 5x5 neighborhood 
 	//    L   ,   a   ,   b   ,| I_x |,| I_y |, | I_xx | ,| I_yy |
@@ -328,6 +303,30 @@ void CRPatch::extractFeatureChannelsPartial(IplImage *img, std::vector<IplImage*
 
 	// 9-bin HOG feature stored at vImg[2] - vImg[11] 
 	hog.extractOBin(vImg[0], vImg[1], vImg, 2);
+	
+	// Get PCAm and PCAs Channel from saved images
+	string delimiter = ".";
+	string s = fullpath;
+	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+	size_t found = token.find_last_of("/\\");
+	string fname = token.substr(found + 1);//filename
+	string path = token.substr(0, found); //full path of image without filename
+	string pfolder = path.substr(path.find_last_of("/\\'")+1); //parent folder only
+	string rootpath = path.substr(0, path.find_last_of("/\\'"));
+	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
+	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
+	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+
+	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+
+	// min filter
+	for (int c = 0; c<11; ++c)
+		minfilt(vImg[c], vImg[c + 11], 5);
+
+	//max filter
+	for (int c = 0; c<11; ++c)
+		maxfilt(vImg[c], 5);
 #if 0
 	// for debugging only
 	char buffer[40];
