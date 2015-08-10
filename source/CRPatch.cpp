@@ -14,7 +14,7 @@ using namespace std;
 void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n, int label, CvRect* box, std::vector<CvPoint>* vCenter) {
 	// extract features
 	vector<IplImage*> vImg;
-	extractFeatureChannelsPartial(img, vImg,fullpath);
+	extractFeatureChannelsExtra(img, vImg,fullpath);
 	
 	CvMat tmp;
 	int offx = width / 2;
@@ -224,6 +224,145 @@ void CRPatch::extractFeatureChannels(IplImage *img, std::vector<IplImage*>& vImg
 
 	for(unsigned int i = 0; i<vImg.size();++i) {
 		sprintf_s(buffer,"%d",i);
+		cvDestroyWindow(buffer);
+	}
+#endif
+
+
+}
+
+void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath) {
+	// 36 feature channels
+	// 7+9 channels: L, a, b, |I_x|, |I_y|, |I_xx|, |I_yy|, HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
+	// 2 channels : PCAm PCAs
+	// 18+18 channels: minfilter + maxfilter on 5x5 neighborhood 
+
+	vImg.resize(36);
+	for (unsigned int c = 0; c<vImg.size(); ++c)
+		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
+
+	// Get intensity
+	cvCvtColor(img, vImg[0], CV_RGB2GRAY);
+
+	// Temporary images for computing I_x, I_y (Avoid overflow for cvSobel)
+	IplImage* I_x = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_16S, 1);
+	IplImage* I_y = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_16S, 1);
+
+	// |I_x|, |I_y|
+	cvSobel(vImg[0], I_x, 1, 0, 3);
+
+	cvSobel(vImg[0], I_y, 0, 1, 3);
+
+	cvConvertScaleAbs(I_x, vImg[3], 0.25);
+
+	cvConvertScaleAbs(I_y, vImg[4], 0.25);
+
+	{
+		short* dataX;
+		short* dataY;
+		uchar* dataZ;
+		int stepX, stepY, stepZ;
+		CvSize size;
+		int x, y;
+
+		cvGetRawData(I_x, (uchar**)&dataX, &stepX, &size);
+		cvGetRawData(I_y, (uchar**)&dataY, &stepY);
+		cvGetRawData(vImg[1], (uchar**)&dataZ, &stepZ);
+		stepX /= sizeof(dataX[0]);
+		stepY /= sizeof(dataY[0]);
+		stepZ /= sizeof(dataZ[0]);
+
+		// Orientation of gradients
+		for (y = 0; y < size.height; y++, dataX += stepX, dataY += stepY, dataZ += stepZ)
+		for (x = 0; x < size.width; x++) {
+			// Avoid division by zero
+			float tx = (float)dataX[x] + (float)_copysign(0.000001f, (float)dataX[x]);
+			// Scaling [-pi/2 pi/2] -> [0 80*pi]
+			dataZ[x] = uchar((atan((float)dataY[x] / tx) + 3.14159265f / 2.0f) * 80);
+		}
+	}
+
+	{
+		short* dataX;
+		short* dataY;
+		uchar* dataZ;
+		int stepX, stepY, stepZ;
+		CvSize size;
+		int x, y;
+
+		cvGetRawData(I_x, (uchar**)&dataX, &stepX, &size);
+		cvGetRawData(I_y, (uchar**)&dataY, &stepY);
+		cvGetRawData(vImg[2], (uchar**)&dataZ, &stepZ);
+		stepX /= sizeof(dataX[0]);
+		stepY /= sizeof(dataY[0]);
+		stepZ /= sizeof(dataZ[0]);
+
+		// Magnitude of gradients
+		for (y = 0; y < size.height; y++, dataX += stepX, dataY += stepY, dataZ += stepZ)
+		for (x = 0; x < size.width; x++) {
+			dataZ[x] = (uchar)(sqrt((float)dataX[x] * (float)dataX[x] + (float)dataY[x] * (float)dataY[x]));
+		}
+	}
+
+	// 9-bin HOG feature stored at vImg[7] - vImg[15] 
+	hog.extractOBin(vImg[1], vImg[2], vImg, 7);
+
+	// |I_xx|, |I_yy|
+
+	cvSobel(vImg[0], I_x, 2, 0, 3);
+	cvConvertScaleAbs(I_x, vImg[5], 0.25);
+
+	cvSobel(vImg[0], I_y, 0, 2, 3);
+	cvConvertScaleAbs(I_y, vImg[6], 0.25);
+
+	// L, a, b
+	cvCvtColor(img, img, CV_RGB2Lab);
+
+	cvReleaseImage(&I_x);
+	cvReleaseImage(&I_y);
+
+	cvSplit(img, vImg[0], vImg[1], vImg[2], 0);
+
+	// Get PCAm and PCAs Channel from saved images
+	string delimiter = ".";
+	string s = fullpath;
+	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+	size_t found = token.find_last_of("/\\");
+	string fname = token.substr(found + 1);//filename
+	string path = token.substr(0, found); //full path of image without filename
+	string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
+	string rootpath = path.substr(0, path.find_last_of("/\\'"));
+	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
+	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
+	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+
+	vImg[16] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	vImg[17] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+
+	// min filter
+	for (int c = 0; c<18; ++c)
+		minfilt(vImg[c], vImg[c + 18], 5);
+
+	//max filter
+	for (int c = 0; c<18; ++c)
+		maxfilt(vImg[c], 5);
+
+
+
+#if 0
+	// for debugging only
+	char buffer[40];
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "out-%d.png", i);
+		cvNamedWindow(buffer, 1);
+		cvShowImage(buffer, vImg[i]);
+		//cvSaveImage( buffer, vImg[i] );
+	}
+
+	cvWaitKey();
+
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "%d", i);
 		cvDestroyWindow(buffer);
 	}
 #endif

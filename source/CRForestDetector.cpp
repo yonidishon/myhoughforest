@@ -15,7 +15,7 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 	// extract features
 	vector<IplImage*> vImg;
 	//CRPatch::extractFeatureChannels(img, vImg);
-	CRPatch::extractFeatureChannelsPartial(img, vImg,imfile); //TODO !!!!!!!!!
+	CRPatch::extractFeatureChannelsExtra(img, vImg, imfile);
 
 	// reset output image
 	for(int c=0; c<(int)imgDetect.size(); ++c)

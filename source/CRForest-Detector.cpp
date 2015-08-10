@@ -531,7 +531,7 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 // Init and start detector
 void run_detect() {
 	// Init forest with number of trees
-	CRForest crForest( ntrees ); 
+	CRForest crForest( ntrees ); ////TODO for distributed system (detecting)
 
 	// Load forest
 	crForest.loadForest(treepath.c_str());	
