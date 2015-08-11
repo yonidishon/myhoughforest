@@ -626,7 +626,7 @@ int main(int argc, char* argv[])
 			break;
 	}
 
-	system("pause");
+	//system("pause");
 	return 0;
 }
 
