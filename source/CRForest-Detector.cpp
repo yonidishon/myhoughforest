@@ -626,6 +626,11 @@ Mat nmsMat2GMM(Mat& nmsmat,IplImage* img,int sigma=10){
 		}
 		
 	}
+	double mymin, mymax;
+	minMaxLoc(GMM, &mymin, &mymax);
+	if (mymax != 0){
+		GMM = GMM / mymax;
+	}
 	return GMM;
 }
 
@@ -700,12 +705,15 @@ void run_post(int sigmaSup = 15) {
 
 		// Load image
 		IplImage *img = 0;
-		img = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
+		img = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 		if (!img) {
 			cout << "Could not load image file: " << (impath + "/" + vFilenames[i]).c_str() << endl;
 			exit(-1);
 		}
-
+		//TODO!
+		// Scalar mean, std;
+		// meanStdDev(cvarrToMat(img), mean, std);
+		//if (mean < 255 / 4) || std < 20 
 		// Non-maximal suppression
 		nonMaximaSuppression(cvarrToMat(img), sigmaSup, nmsmat, Mat());
 
@@ -727,7 +735,10 @@ void run_post(int sigmaSup = 15) {
 			system(execstr1.c_str());
 		}
 		sprintf_s(buffer, "%s\\%s.png", curfolder.c_str(), fname.c_str());
-		imwrite(buffer, gmmmat);
+		Mat final;
+		gmmmat = gmmmat * 255;
+		gmmmat.convertTo(final, CV_8UC1);
+		imwrite(buffer, final);
 		//cvSaveImage( buffer, tmp );
 		// Release image
 		//cvReleaseImage(&img);
