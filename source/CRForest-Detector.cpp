@@ -57,18 +57,24 @@
 #define PATH_SEP "\\"
 
 #include <stdexcept>
-
+#include <stdint.h>
+#include <stdio.h>
 #include <vector>
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <limits>
 #include <Windows.h>
 #include "Shlwapi.h"
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d/features2d.hpp>
 
 #include "CRForestDetector.h"
 
 using namespace std;
+using namespace cv;
 
 // Path to trees
 string treepath;
@@ -390,6 +396,7 @@ void show() {
 
 // Run detector
 void detect(CRForestDetector& crDetect) {
+	
 
 	// Load image names
 	vector<string> vFilenames;
@@ -456,6 +463,7 @@ void detect(CRForestDetector& crDetect) {
 
 }
 
+	
 // Extract patches from training data
 void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 		
@@ -528,6 +536,99 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 	cout << endl;
 }
 
+void nonMaximaSuppression(const Mat& src, const int sz, Mat& dst, const Mat mask) {
+
+	// initialise the block mask and destination
+	const int M = src.rows;
+	const int N = src.cols;
+	const bool masked = !mask.empty();
+	Mat block = 255*Mat_<uint8_t>::ones(Size(2*sz+1,2*sz+1));
+	dst = Mat_<uint8_t>::zeros(src.size());
+
+	// iterate over image blocks
+	for (int m = 0; m < M; m+=sz+1) {
+		for (int n = 0; n < N; n+=sz+1) {
+			Point  ijmax;
+			double vcmax, vnmax;
+			//if (m == 110 && n == 198) {
+			//	printf("Debug\n");
+			//}
+			//printf("row %d and col %d\n", m, n);
+			// get the maximal candidate within the block
+			Range ic(m, min(m+sz+1,M));
+			Range jc(n, min(n+sz+1,N));
+			minMaxLoc(src(ic,jc), NULL, &vcmax, NULL, &ijmax, masked ? mask(ic,jc) : noArray());
+			Point cc = ijmax + Point(jc.start,ic.start);
+
+			// search the neighbours centered around the candidate for the true maxima
+			Range in(max(cc.y-sz,0), min(cc.y+sz+1,M));
+			Range jn(max(cc.x-sz,0), min(cc.x+sz+1,N));
+
+			// mask out the block whose maxima we already know
+			Mat_<uint8_t> blockmask;
+			block(Range(0,in.size()), Range(0,jn.size())).copyTo(blockmask);
+			Range iis(ic.start-in.start, min(ic.start-in.start+sz+1, in.size()));
+			Range jis(jc.start-jn.start, min(jc.start-jn.start+sz+1, jn.size()));
+			blockmask(iis, jis) = Mat_<uint8_t>::zeros(Size(jis.size(),iis.size()));
+
+			minMaxLoc(src(in,jn), NULL, &vnmax, NULL, &ijmax, masked ? mask(in,jn).mul(blockmask) : blockmask);
+			Point cn = ijmax + Point(jn.start, in.start);
+
+			// if the block centre is also the neighbour centre, then it's a local maxima
+			if (vcmax > vnmax) {
+				dst.at<uint8_t>(cc.y, cc.x) = 255;
+			}
+		}
+	}
+}
+
+static void meshgrid(const Mat &xgv, const Mat &ygv,
+	Mat1i &X, cv::Mat1i &Y)
+{
+	repeat(xgv.reshape(1, 1), ygv.total(), 1, X);
+	repeat(ygv.reshape(1, 1).t(), 1, xgv.total(), Y);
+}
+
+// helper function (maybe that goes somehow easier)
+static void meshgridTest(const Range &xgv, const Range &ygv,
+	Mat1i &X, Mat1i &Y)
+{
+	vector<int> t_x, t_y;
+	for (int i = xgv.start; i < xgv.end; i++) t_x.push_back(i);
+	for (int i = ygv.start; i < ygv.end; i++) t_y.push_back(i);
+	meshgrid(Mat(t_x), Mat(t_y), X, Y);
+}
+
+Mat nmsMat2GMM(Mat& nmsmat,IplImage* img,int sigma=10){
+	Mat locations;   // output, locations of non-zero pixels 
+	findNonZero(nmsmat, locations);
+	vector<int> pnts;
+	vector<CvPoint> ps;
+	for (int i = 0; i < locations.rows; i++){
+		ps.push_back(locations.at<Point>(i));
+		pnts.push_back(cvarrToMat(img).at<uchar>(ps[i].y, ps[i].x));
+	}
+	Mat1i X, Y;
+	meshgridTest(Range(0, nmsmat.cols), Range(0, nmsmat.rows), X, Y);
+	Mat GMM(nmsmat.rows, nmsmat.cols, CV_64F, Scalar::all(0));
+	for (int i = 0; i < ps.size(); i++){
+		Mat fg(nmsmat.rows, nmsmat.cols, CV_64F);
+		for (int j = 0; j < nmsmat.rows; j++){
+			for (int k = 0; k < nmsmat.cols; k++){
+				fg.at<double>(j, k) = exp(-((double(pow((Y.at<int>(j, k) - ps[i].y), 2)) / 2 / pow(sigma, 2)) + (double(pow((X.at<int>(j, k) - ps[i].x), 2)) / 2 / pow(sigma, 2))));
+			}
+		}
+		double mymin,mymax;
+		minMaxLoc(fg, &mymin, &mymax);
+		if (mymax != 0){
+			fg = (pnts[i] * fg) / mymax;
+			GMM = GMM + fg;
+		}
+		
+	}
+	return GMM;
+}
+
 // Init and start detector
 void run_detect() {
 	// Init forest with number of trees
@@ -582,6 +683,58 @@ void run_train() {
 
 }
 
+void run_post(int sigmaSup = 15) {
+
+
+	// Load image names
+	vector<string> vFilenames;
+	loadImFile(vFilenames);
+
+	char buffer[200];
+
+	// Storage for output
+	Mat nmsmat, gmmmat;
+
+	// Run detector for each image
+	for (unsigned int i = 0; i<vFilenames.size(); ++i) {
+
+		// Load image
+		IplImage *img = 0;
+		img = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
+		if (!img) {
+			cout << "Could not load image file: " << (impath + "/" + vFilenames[i]).c_str() << endl;
+			exit(-1);
+		}
+
+		// Non-maximal suppression
+		nonMaximaSuppression(cvarrToMat(img), sigmaSup, nmsmat, Mat());
+
+		// Gaussian of maximas
+		gmmmat = nmsMat2GMM(nmsmat, img);
+		// Store result
+		string delimiter = ".";
+		string s = vFilenames[i].c_str();
+		string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+		size_t found = token.find_last_of("/\\");
+		string fname = token.substr(found + 1);//filename
+		string path = token.substr(0, found); //full path of image without filename
+		string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
+		string curfolder = outpath + "\\" + pfolder; //store path for detection
+		// Check if folder for result is exist and create if not
+		if (!DirectoryExists(curfolder.c_str())){
+			string execstr1 = "mkdir ";
+			execstr1 += curfolder;
+			system(execstr1.c_str());
+		}
+		sprintf_s(buffer, "%s\\%s.png", curfolder.c_str(), fname.c_str());
+		imwrite(buffer, gmmmat);
+		//cvSaveImage( buffer, tmp );
+		// Release image
+		//cvReleaseImage(&img);
+	}
+
+}
+
 int main(int argc, char* argv[])
 {
 	int mode = 1;
@@ -617,7 +770,13 @@ int main(int argc, char* argv[])
 					
 			// train forest
 			show();
-			break;	
+			break;
+
+		case 3:
+		//post processing: 1. Non-maximal supression 2. Gaussian Kernel convolution
+			run_post();
+			break;
+		
 
 		default:
 
