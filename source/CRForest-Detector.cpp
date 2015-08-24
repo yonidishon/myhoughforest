@@ -446,10 +446,11 @@ void detect(CRForestDetector& crDetect) {
 		}	
 		
 		for(unsigned int k=0;k<vImgDetect.size(); ++k) {
-			//IplImage* tmp = cvCreateImage( cvSize(vImgDetect[k][0]->width,vImgDetect[k][0]->height) , IPL_DEPTH_8U , 1);
+			IplImage* tmp = cvCreateImage(cvSize(vImgDetect[k][0]->width, vImgDetect[k][0]->height), IPL_DEPTH_16U, 1);
 			for(unsigned int c=0;c<vImgDetect[k].size(); ++c) {
 				//cvConvertScale( vImgDetect[k][c], tmp, out_scale); //80 128
-				sprintf_s(buffer, "%s\\%s_sc%d_c%d_predmap.bmp", curfolder.c_str(), fname.c_str(), k, c);
+				cvConvertScale(vImgDetect[k][c], tmp, out_scale);
+				sprintf_s(buffer, "%s\\%s_sc%d_c%d_predmap.png", curfolder.c_str(), fname.c_str(), k, c);
 				//cvSaveImage(buffer, tmp);
 				cvSaveImage(buffer, vImgDetect[k][c]);
 				cvReleaseImage(&vImgDetect[k][c]);
@@ -583,7 +584,7 @@ void nonMaximaSuppression(const Mat& src, const int sz, Mat& dst, const Mat mask
 }
 
 static void meshgrid(const Mat &xgv, const Mat &ygv,
-	Mat1i &X, cv::Mat1i &Y)
+	Mat1i &X, Mat1i &Y)
 {
 	repeat(xgv.reshape(1, 1), ygv.total(), 1, X);
 	repeat(ygv.reshape(1, 1).t(), 1, xgv.total(), Y);
@@ -599,14 +600,14 @@ static void meshgridTest(const Range &xgv, const Range &ygv,
 	meshgrid(Mat(t_x), Mat(t_y), X, Y);
 }
 
-Mat nmsMat2GMM(Mat& nmsmat,IplImage* img,int sigma=10){
+Mat nmsMat2GMM(Mat& nmsmat,Mat& img,int sigma=10){
 	Mat locations;   // output, locations of non-zero pixels 
 	findNonZero(nmsmat, locations);
 	vector<int> pnts;
 	vector<CvPoint> ps;
 	for (int i = 0; i < locations.rows; i++){
 		ps.push_back(locations.at<Point>(i));
-		pnts.push_back(cvarrToMat(img).at<uchar>(ps[i].y, ps[i].x));
+		pnts.push_back(img.at<uchar>(ps[i].y, ps[i].x));
 	}
 	Mat1i X, Y;
 	meshgridTest(Range(0, nmsmat.cols), Range(0, nmsmat.rows), X, Y);
@@ -729,9 +730,9 @@ void run_post(int sigmaSup = 9) {
 	for (unsigned int i = 0; i<vFilenames.size(); ++i) {
 
 		// Load image
-		IplImage *img = 0;
-		img = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_ANYDEPTH); //previous implementaion save .png (8-bit) I'm saving .bmp (32bit float)
-		if (!img) {
+		//IplImage *img = 0;
+		Mat img = imread(vFilenames[i].c_str(), CV_LOAD_IMAGE_UNCHANGED); //previous implementaion save .png (8-bit) I'm saving .png (16bit uint)
+		if (img.data==NULL) {
 			cout << "Could not load image file: " << (impath + "/" + vFilenames[i]).c_str() << endl;
 			exit(-1);
 		}
@@ -739,11 +740,12 @@ void run_post(int sigmaSup = 9) {
 		// Scalar mean, std;
 		// meanStdDev(cvarrToMat(img), mean, std);
 		//if (mean < 255 / 4) || std < 20 
-
+		Mat imgdbl;
+		img.convertTo(imgdbl, CV_32F, 1. / out_scale);
 		// Blurring the result witn a 9x9 2-sigma 
 		Mat blur;
-		GaussianBlur(cvarrToMat(img), blur, Size(9, 9), 2, 2);
-		int med=medianMat(blur, pow(2, 32));
+		GaussianBlur(imgdbl, blur, Size(9, 9), 2, 2);
+		double med=medianMat(blur, pow(2, 16));
 		Mat blurth;
 		blur.copyTo(blurth, (blur >= med)); //TODO - check that this works
 		Mat diff = abs(blur - blurth);
@@ -752,7 +754,7 @@ void run_post(int sigmaSup = 9) {
 		//nonMaximaSuppression(cvarrToMat(img), sigmaSup, nmsmat, Mat());
 
 		// Gaussian of maximas
-		gmmmat = nmsMat2GMM(nmsmat, img);
+		gmmmat = nmsMat2GMM(nmsmat, imgdbl);
 		// Store result
 		string delimiter = ".";
 		string s = vFilenames[i].c_str();
