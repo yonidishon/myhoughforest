@@ -455,7 +455,7 @@ void detect(CRForestDetector& crDetect) {
 				//cvSaveImage(buffer, vImgDetect[k][c]);
 				cvReleaseImage(&vImgDetect[k][c]);
 			}
-			//cvReleaseImage(&tmp);
+			cvReleaseImage(&tmp);
 		}
 
 		// Release image

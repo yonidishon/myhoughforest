@@ -63,20 +63,20 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 			        // 
 				//if((*itL)->pfg>0.5) {
 
-				//	// voting weight for leaf 
-				//	float w = (*itL)->pfg / float( (*itL)->vCenter.size() * result.size() );
+					// voting weight for leaf 
+					float w = (*itL)->pfg / float( (*itL)->vCenter.size() * result.size() );
 
-				//	// vote for all points stored in the leaf
-				//	for(vector<vector<CvPoint> >::const_iterator it = (*itL)->vCenter.begin(); it!=(*itL)->vCenter.end(); ++it) {
+					// vote for all points stored in the leaf
+					for(vector<vector<CvPoint> >::const_iterator it = (*itL)->vCenter.begin(); it!=(*itL)->vCenter.end(); ++it) {
 
-				//		for(int c=0; c<(int)imgDetect.size(); ++c) {
-				//		  int x = int(cx - (*it)[0].x * ratios[c] + 0.5);
-				//		  int y = cy-(*it)[0].y;
-				//		  if(y>=0 && y<imgDetect[c]->height && x>=0 && x<imgDetect[c]->width) {
-				//		    *(ptDet[c]+x+y*stepDet) += w;
-				//		  }
-				//		}
-				//	}
+						for(int c=0; c<(int)imgDetect.size(); ++c) {
+						  int x = int(cx - (*it)[0].x * ratios[c] + 0.5);
+						  int y = cy-(*it)[0].y;
+						  if(y>=0 && y<imgDetect[c]->height && x>=0 && x<imgDetect[c]->width) {
+						    *(ptDet[c]+x+y*stepDet) += w;
+						  }
+						}
+					}
 
 				// } // end if
 
