@@ -446,14 +446,15 @@ void detect(CRForestDetector& crDetect) {
 		}	
 		
 		for(unsigned int k=0;k<vImgDetect.size(); ++k) {
-			IplImage* tmp = cvCreateImage( cvSize(vImgDetect[k][0]->width,vImgDetect[k][0]->height) , IPL_DEPTH_8U , 1);
+			//IplImage* tmp = cvCreateImage( cvSize(vImgDetect[k][0]->width,vImgDetect[k][0]->height) , IPL_DEPTH_8U , 1);
 			for(unsigned int c=0;c<vImgDetect[k].size(); ++c) {
-				cvConvertScale( vImgDetect[k][c], tmp, out_scale); //80 128
-				sprintf_s(buffer, "%s\\%s_sc%d_c%d_predmap.png", curfolder.c_str(), fname.c_str(), k, c);
-				cvSaveImage( buffer, tmp );
+				//cvConvertScale( vImgDetect[k][c], tmp, out_scale); //80 128
+				sprintf_s(buffer, "%s\\%s_sc%d_c%d_predmap.bmp", curfolder.c_str(), fname.c_str(), k, c);
+				//cvSaveImage(buffer, tmp);
+				cvSaveImage(buffer, vImgDetect[k][c]);
 				cvReleaseImage(&vImgDetect[k][c]);
 			}
-			cvReleaseImage(&tmp);
+			//cvReleaseImage(&tmp);
 		}
 
 		// Release image
@@ -462,7 +463,6 @@ void detect(CRForestDetector& crDetect) {
 	}
 
 }
-
 	
 // Extract patches from training data
 void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
@@ -634,6 +634,31 @@ Mat nmsMat2GMM(Mat& nmsmat,IplImage* img,int sigma=10){
 	return GMM;
 }
 
+double medianMat(Mat Input, int nVals){
+
+	// COMPUTE HISTOGRAM OF SINGLE CHANNEL MATRIX
+	float range[] = { 0, nVals };
+	const float* histRange = { range };
+	bool uniform = true; bool accumulate = false;
+	Mat hist;
+	calcHist(&Input, 1, 0, Mat(), hist, 1, &nVals, &histRange, uniform, accumulate);
+
+	// COMPUTE CUMULATIVE DISTRIBUTION FUNCTION (CDF)
+	Mat cdf;
+	hist.copyTo(cdf);
+	for (int i = 1; i <= nVals - 1; i++){
+		cdf.at<float>(i) += cdf.at<float>(i - 1);
+	}
+	cdf /= Input.total();
+
+	// COMPUTE MEDIAN
+	double medianVal;
+	for (int i = 0; i <= nVals - 1; i++){
+		if (cdf.at<float>(i) >= 0.95) { medianVal = i;  break; }
+	}
+	return medianVal / nVals;
+}
+
 // Init and start detector
 void run_detect() {
 	// Init forest with number of trees
@@ -688,7 +713,7 @@ void run_train() {
 
 }
 
-void run_post(int sigmaSup = 15) {
+void run_post(int sigmaSup = 9) {
 
 
 	// Load image names
@@ -705,7 +730,7 @@ void run_post(int sigmaSup = 15) {
 
 		// Load image
 		IplImage *img = 0;
-		img = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+		img = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_ANYDEPTH); //previous implementaion save .png (8-bit) I'm saving .bmp (32bit float)
 		if (!img) {
 			cout << "Could not load image file: " << (impath + "/" + vFilenames[i]).c_str() << endl;
 			exit(-1);
@@ -714,8 +739,17 @@ void run_post(int sigmaSup = 15) {
 		// Scalar mean, std;
 		// meanStdDev(cvarrToMat(img), mean, std);
 		//if (mean < 255 / 4) || std < 20 
+
+		// Blurring the result witn a 9x9 2-sigma 
+		Mat blur;
+		GaussianBlur(cvarrToMat(img), blur, Size(9, 9), 2, 2);
+		int med=medianMat(blur, pow(2, 32));
+		Mat blurth;
+		blur.copyTo(blurth, (blur >= med)); //TODO - check that this works
+		Mat diff = abs(blur - blurth);
 		// Non-maximal suppression
-		nonMaximaSuppression(cvarrToMat(img), sigmaSup, nmsmat, Mat());
+		nonMaximaSuppression(blur, sigmaSup, nmsmat, Mat());
+		//nonMaximaSuppression(cvarrToMat(img), sigmaSup, nmsmat, Mat());
 
 		// Gaussian of maximas
 		gmmmat = nmsMat2GMM(nmsmat, img);
@@ -742,6 +776,7 @@ void run_post(int sigmaSup = 15) {
 		//cvSaveImage( buffer, tmp );
 		// Release image
 		//cvReleaseImage(&img);
+		cout << fname.c_str() << endl;
 	}
 
 }
@@ -796,7 +831,7 @@ int main(int argc, char* argv[])
 			break;
 	}
 
-	//system("pause");
+	system("pause");
 	return 0;
 }
 
