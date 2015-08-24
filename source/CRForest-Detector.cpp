@@ -451,8 +451,8 @@ void detect(CRForestDetector& crDetect) {
 				//cvConvertScale( vImgDetect[k][c], tmp, out_scale); //80 128
 				cvConvertScale(vImgDetect[k][c], tmp, out_scale);
 				sprintf_s(buffer, "%s\\%s_sc%d_c%d_predmap.png", curfolder.c_str(), fname.c_str(), k, c);
-				//cvSaveImage(buffer, tmp);
-				cvSaveImage(buffer, vImgDetect[k][c]);
+				cvSaveImage(buffer, tmp);
+				//cvSaveImage(buffer, vImgDetect[k][c]);
 				cvReleaseImage(&vImgDetect[k][c]);
 			}
 			//cvReleaseImage(&tmp);
