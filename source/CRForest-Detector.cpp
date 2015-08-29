@@ -603,11 +603,11 @@ static void meshgridTest(const Range &xgv, const Range &ygv,
 Mat nmsMat2GMM(Mat& nmsmat,Mat& img,int sigma=10){
 	Mat locations;   // output, locations of non-zero pixels 
 	findNonZero(nmsmat, locations);
-	vector<int> pnts;
+	vector<float> pnts;
 	vector<CvPoint> ps;
 	for (int i = 0; i < locations.rows; i++){
 		ps.push_back(locations.at<Point>(i));
-		pnts.push_back(img.at<uchar>(ps[i].y, ps[i].x));
+		pnts.push_back(img.at<float>(ps[i].y, ps[i].x));
 	}
 	Mat1i X, Y;
 	meshgridTest(Range(0, nmsmat.cols), Range(0, nmsmat.rows), X, Y);
@@ -638,12 +638,26 @@ Mat nmsMat2GMM(Mat& nmsmat,Mat& img,int sigma=10){
 double medianMat(Mat Input, int nVals){
 
 	// COMPUTE HISTOGRAM OF SINGLE CHANNEL MATRIX
-	float range[] = { 0, nVals };
-	const float* histRange = { range };
+	float range[] = { 0, 1 };
+	const float* histRange[] = { range };
 	bool uniform = true; bool accumulate = false;
 	Mat hist;
-	calcHist(&Input, 1, 0, Mat(), hist, 1, &nVals, &histRange, uniform, accumulate);
+	calcHist(&Input, 1, 0, Mat(), hist, 1, &nVals, histRange, uniform, accumulate);
+	
+	//TODO!
 
+	//Mat histImg = Mat::zeros(sbins*scale, hbins * 10, CV_8UC3);
+
+	//for (int h = 0; h < hbins; h++)
+	//for (int s = 0; s < sbins; s++)
+	//{
+	//	float binVal = hist.at<float>(h, s);
+	//	int intensity = cvRound(binVal * 255 / maxVal);
+	//	rectangle(histImg, Point(h*scale, s*scale),
+	//		Point((h + 1)*scale - 1, (s + 1)*scale - 1),
+	//		Scalar::all(intensity),
+	//		CV_FILLED);
+	//}
 	// COMPUTE CUMULATIVE DISTRIBUTION FUNCTION (CDF)
 	Mat cdf;
 	hist.copyTo(cdf);
@@ -747,10 +761,24 @@ void run_post(int sigmaSup = 9) {
 		GaussianBlur(imgdbl, blur, Size(9, 9), 2, 2);
 		double med=medianMat(blur, pow(2, 16));
 		Mat blurth;
-		blur.copyTo(blurth, (blur >= med)); //TODO - check that this works
-		Mat diff = abs(blur - blurth);
+		Mat BW = (blur >= med); // blur above TH - Binary map
+		vector<vector<Point> > contours;
+		findContours(BW, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+		vector<int> idx;
+		for (size_t k = 0; k < contours.size(); k++){
+			double area = contourArea(contours[k]);
+			if (area > 30 * 30){
+				idx.push_back(k);
+				cout << area << "contour idx " << k << endl;
+			}
+		}
+		Mat BWfilt = Mat::zeros(BW.rows,BW.cols,CV_8UC1);
+		for (size_t k = 0; k < idx.size(); k++)
+			drawContours(BWfilt, contours, idx.at(k), Scalar(255), -1, 8,noArray(), 0);//TODO
+		blur.copyTo(blurth, BWfilt); //TODO - check that this works
+
 		// Non-maximal suppression
-		nonMaximaSuppression(blur, sigmaSup, nmsmat, Mat());
+		nonMaximaSuppression(blurth, sigmaSup, nmsmat, Mat());
 		//nonMaximaSuppression(cvarrToMat(img), sigmaSup, nmsmat, Mat());
 
 		// Gaussian of maximas
