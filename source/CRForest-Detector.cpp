@@ -765,22 +765,42 @@ void run_post(int sigmaSup = 9) {
 		vector<vector<Point> > contours;
 		findContours(BW, contours, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
 		vector<int> idx;
-		for (size_t k = 0; k < contours.size(); k++){
-			double area = contourArea(contours[k]);
-			if (area > 30 * 30){
-				idx.push_back(k);
-				cout << area << "contour idx " << k << endl;
+		double maxarea = -1;
+		int  maxidx = -1;
+		if (contours.size() > 1){
+			for (size_t k = 0; k < contours.size(); k++){
+				double area = contourArea(contours[k]);
+				if (area > maxarea){
+					maxarea = area;
+					maxidx == k;
+				}
+				if (area > 30 * 30){
+					idx.push_back(k);
+					//cout << "Area is: "<< area << " Contour idx: " << k << endl;
+				}
 			}
 		}
-		Mat BWfilt = Mat::zeros(BW.rows,BW.cols,CV_8UC1);
-		for (size_t k = 0; k < idx.size(); k++)
-			drawContours(BWfilt, contours, idx.at(k), Scalar(255), -1, 8,noArray(), 0);//TODO
-		blur.copyTo(blurth, BWfilt); //TODO - check that this works
+		else // only one contour best guess is its peak
+			idx.push_back(0);
+		Mat BWfilt = Mat::zeros(BW.rows, BW.cols, CV_8UC1);
+		if (idx.empty()) // there are lots of peaks but none is significant - best guess is the middle of the frame
+			BWfilt.at<uchar>(Point(round(BW.cols / 2),round(BW.rows / 2))) = 1;
+		else {
+			for (size_t k = 0; k < idx.size(); k++)
+				drawContours(BWfilt, contours, idx.at(k), Scalar(255), -1, 8, noArray(), 0);
+		}
+		blur.copyTo(blurth, BWfilt); 
 
 		// Non-maximal suppression
 		nonMaximaSuppression(blurth, sigmaSup, nmsmat, Mat());
 		//nonMaximaSuppression(cvarrToMat(img), sigmaSup, nmsmat, Mat());
-
+		double maxnmsmat;
+		minMaxLoc(nmsmat,NULL,&maxnmsmat);
+		if (maxnmsmat == 0) { // no maximum output from NMS pick the maimum of blurth
+			Point pnt;
+			minMaxLoc(blurth, NULL, NULL, NULL, &pnt);
+			nmsmat.at<uchar>(pnt) = 1;
+		}
 		// Gaussian of maximas
 		gmmmat = nmsMat2GMM(nmsmat, imgdbl);
 		// Store result
