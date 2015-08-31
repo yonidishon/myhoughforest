@@ -720,7 +720,7 @@ void run_train() {
 	// Extract training patches
 	extract_Patches(Train, &cvRNG); 
 
-	// Train forest
+	// Train forest (minimum patches,max_depth,Trainset,# of different tests to randomly create)
 	crForest.trainForest(20, 15, &cvRNG, Train, 2000);
 
 	// Save forest

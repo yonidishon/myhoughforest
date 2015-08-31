@@ -239,7 +239,7 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 
 	vImg.resize(36);
 	for (unsigned int c = 0; c<vImg.size(); ++c)
-		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
+		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_16U, 1);
 
 	// Get intensity
 	cvCvtColor(img, vImg[0], CV_RGB2GRAY);
@@ -253,14 +253,17 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 
 	cvSobel(vImg[0], I_y, 0, 1, 3);
 
-	cvConvertScaleAbs(I_x, vImg[3], 0.25);
-
-	cvConvertScaleAbs(I_y, vImg[4], 0.25);
-
+	//cvConvertScaleAbs(I_x, vImg[3], 0.25);
+	cvConvertScale(I_x, vImg[3], 0.25);
+	cvAbs(vImg[3], vImg[3]);
+	//cvConvertScaleAbs(I_y, vImg[4], 0.25);
+	cvConvertScale(I_y, vImg[4], 0.25);
+	cvAbs(vImg[4], vImg[4]);
+	//calculate orientation of Gradients
 	{
 		short* dataX;
 		short* dataY;
-		uchar* dataZ;
+		unsigned __int16* dataZ;
 		int stepX, stepY, stepZ;
 		CvSize size;
 		int x, y;
@@ -278,14 +281,14 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 			// Avoid division by zero
 			float tx = (float)dataX[x] + (float)_copysign(0.000001f, (float)dataX[x]);
 			// Scaling [-pi/2 pi/2] -> [0 80*pi]
-			dataZ[x] = uchar((atan((float)dataY[x] / tx) + 3.14159265f / 2.0f) * 80);
+			dataZ[x] = unsigned __int16((atan((float)dataY[x] / tx) + 3.14159265f / 2.0f) * 80);
 		}
 	}
-
+	//calculate Magnitude of Gradients
 	{
 		short* dataX;
 		short* dataY;
-		uchar* dataZ;
+		unsigned __int16* dataZ;
 		int stepX, stepY, stepZ;
 		CvSize size;
 		int x, y;
@@ -300,20 +303,27 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 		// Magnitude of gradients
 		for (y = 0; y < size.height; y++, dataX += stepX, dataY += stepY, dataZ += stepZ)
 		for (x = 0; x < size.width; x++) {
-			dataZ[x] = (uchar)(sqrt((float)dataX[x] * (float)dataX[x] + (float)dataY[x] * (float)dataY[x]));
+			dataZ[x] = (unsigned __int16)(sqrt((float)dataX[x] * (float)dataX[x] + (float)dataY[x] * (float)dataY[x]));
 		}
 	}
 
-	// 9-bin HOG feature stored at vImg[7] - vImg[15] 
+	// 9-bin HOG feature stored at vImg[7] - vImg[15]
+	IplImage* vImg1_8b, vImg2_8b;
+	// TODO TODO TODO
+	cvConvertScale(255/65535.0)
 	hog.extractOBin(vImg[1], vImg[2], vImg, 7);
 
 	// |I_xx|, |I_yy|
 
 	cvSobel(vImg[0], I_x, 2, 0, 3);
-	cvConvertScaleAbs(I_x, vImg[5], 0.25);
+	//cvConvertScaleAbs(I_x, vImg[5], 0.25);
+	cvConvertScale(I_y, vImg[5], 0.25);
+	cvAbs(vImg[5], vImg[5]);
 
 	cvSobel(vImg[0], I_y, 0, 2, 3);
-	cvConvertScaleAbs(I_y, vImg[6], 0.25);
+	//cvConvertScaleAbs(I_y, vImg[6], 0.25);
+	cvConvertScale(I_y, vImg[6], 0.25);
+	cvAbs(vImg[6], vImg[6]);
 
 	// L, a, b
 	cvCvtColor(img, img, CV_RGB2Lab);
@@ -336,8 +346,8 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
 	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
 
-	vImg[16] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-	vImg[17] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	vImg[16] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_ANYDEPTH);
+	vImg[17] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_ANYDEPTH);
 
 	// min filter
 	for (int c = 0; c<18; ++c)
