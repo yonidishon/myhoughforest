@@ -601,13 +601,13 @@ static void meshgridTest(const Range &xgv, const Range &ygv,
 }
 
 Mat nmsMat2GMM(Mat& nmsmat,Mat& img,int sigma=10){
-	Mat locations;   // output, locations of non-zero pixels 
+	vector<Point> locations;   // output, locations of non-zero pixels 
 	findNonZero(nmsmat, locations);
 	vector<float> pnts;
-	vector<CvPoint> ps;
-	for (int i = 0; i < locations.rows; i++){
-		ps.push_back(locations.at<Point>(i));
-		pnts.push_back(img.at<float>(ps[i].y, ps[i].x));
+	vector<Point> ps;
+	for (int i = 0; i < locations.size(); i+=10){
+		ps.push_back(locations[i]);
+		pnts.push_back(img.at<float>(locations[i].y, locations[i].x));
 	}
 	Mat1i X, Y;
 	meshgridTest(Range(0, nmsmat.cols), Range(0, nmsmat.rows), X, Y);
@@ -644,7 +644,7 @@ double medianMat(Mat Input, int nVals){
 	Mat hist;
 	calcHist(&Input, 1, 0, Mat(), hist, 1, &nVals, histRange, uniform, accumulate);
 	
-	//TODO!
+	//TODO! -hist image - not a must!
 
 	//Mat histImg = Mat::zeros(sbins*scale, hbins * 10, CV_8UC3);
 
@@ -742,7 +742,6 @@ void run_post(int sigmaSup = 9) {
 
 	// Run detector for each image
 	for (unsigned int i = 0; i<vFilenames.size(); ++i) {
-
 		// Load image
 		//IplImage *img = 0;
 		Mat img = imread(vFilenames[i].c_str(), CV_LOAD_IMAGE_UNCHANGED); //previous implementaion save .png (8-bit) I'm saving .png (16bit uint)
@@ -772,9 +771,9 @@ void run_post(int sigmaSup = 9) {
 				double area = contourArea(contours[k]);
 				if (area > maxarea){
 					maxarea = area;
-					maxidx == k;
+					maxidx = k;
 				}
-				if (area > 30 * 30){
+				if (area > 20 * 20){
 					idx.push_back(k);
 					//cout << "Area is: "<< area << " Contour idx: " << k << endl;
 				}
@@ -784,7 +783,7 @@ void run_post(int sigmaSup = 9) {
 			idx.push_back(0);
 		Mat BWfilt = Mat::zeros(BW.rows, BW.cols, CV_8UC1);
 		if (idx.empty()) // there are lots of peaks but none is significant - best guess is the middle of the frame
-			BWfilt.at<uchar>(Point(round(BW.cols / 2),round(BW.rows / 2))) = 1;
+			BWfilt.at<uchar>(Point(round(BW.cols / 2),round(BW.rows / 2))) = 255;
 		else {
 			for (size_t k = 0; k < idx.size(); k++)
 				drawContours(BWfilt, contours, idx.at(k), Scalar(255), -1, 8, noArray(), 0);
@@ -792,17 +791,17 @@ void run_post(int sigmaSup = 9) {
 		blur.copyTo(blurth, BWfilt); 
 
 		// Non-maximal suppression
-		nonMaximaSuppression(blurth, sigmaSup, nmsmat, Mat());
+		// nonMaximaSuppression(blurth, sigmaSup, nmsmat, Mat());
 		//nonMaximaSuppression(cvarrToMat(img), sigmaSup, nmsmat, Mat());
-		double maxnmsmat;
-		minMaxLoc(nmsmat,NULL,&maxnmsmat);
-		if (maxnmsmat == 0) { // no maximum output from NMS pick the maimum of blurth
-			Point pnt;
-			minMaxLoc(blurth, NULL, NULL, NULL, &pnt);
-			nmsmat.at<uchar>(pnt) = 1;
-		}
+		//double maxnmsmat;
+		//minMaxLoc(nmsmat,NULL,&maxnmsmat);
+		//if (maxnmsmat == 0) { // no maximum output from NMS pick the maimum of blurth
+		//	Point pnt;
+		//	minMaxLoc(blurth, NULL, NULL, NULL, &pnt);
+		//	nmsmat.at<uchar>(pnt) = 1;
+		//}
 		// Gaussian of maximas
-		gmmmat = nmsMat2GMM(nmsmat, imgdbl);
+		gmmmat = nmsMat2GMM(BWfilt, imgdbl);
 		// Store result
 		string delimiter = ".";
 		string s = vFilenames[i].c_str();

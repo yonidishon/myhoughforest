@@ -309,8 +309,8 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 
 	// 9-bin HOG feature stored at vImg[7] - vImg[15]
 	IplImage* vImg1_8b, vImg2_8b;
-	// TODO TODO TODO
-	cvConvertScale(255/65535.0)
+	// TODO TODO TODO - trying to convert the hog to tmp and then just scale it.
+	// cvConvertScale(255/65535.0)
 	hog.extractOBin(vImg[1], vImg[2], vImg, 7);
 
 	// |I_xx|, |I_yy|
