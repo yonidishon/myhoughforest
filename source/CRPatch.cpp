@@ -10,7 +10,7 @@
 #include <deque>
 
 using namespace std;
-
+// extract patches for training (thery are saved inside CRPatch in vLPatches[label=0/1]
 void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n, int label, CvRect* box, std::vector<CvPoint>* vCenter) {
 	// extract features
 	vector<IplImage*> vImg;
@@ -38,8 +38,10 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 
 		vLPatches[label].back().roi.x = pt.x;  vLPatches[label].back().roi.y = pt.y;
 		vLPatches[label].back().roi.width = width;  vLPatches[label].back().roi.height = height;
+		vLPatches[label].back().fg = label;
 
 		if (vCenter != 0) {
+			// saving the offset from the peak of distribution for all channels @ center.x/y
 			vLPatches[label].back().center.resize(vCenter->size());
 			for (unsigned int c = 0; c<vCenter->size(); ++c) {
 				vLPatches[label].back().center[c].x = pt.x + offx - (*vCenter)[c].x;
@@ -47,6 +49,7 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 			}
 		}
 
+		//saving all feature channels of patch
 		vLPatches[label].back().vPatch.resize(vImg.size());
 		for (unsigned int c = 0; c<vImg.size(); ++c) {
 			cvGetSubRect(vImg[c], &tmp, vLPatches[label].back().roi);

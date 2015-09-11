@@ -108,6 +108,81 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 
 }
 
+void CRForestDetector::detectColorcascade(PatchFeature& p, priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& pos_bad_examples,
+	priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& neg_bad_examples, int k, std::vector<float>& ratios) {
+
+	// get pointers to feature channels
+	int stepImg;
+	uchar** ptFCh = new uchar*[p.vPatch.size()];
+	uchar** ptFCh_row = new uchar*[p.vPatch.size()];
+	for (unsigned int c = 0; c<p.vPatch.size(); ++c) {
+		cvGetRawData(p.vPatch[c], (uchar**)&(ptFCh[c]), &stepImg);
+	}
+	stepImg /= sizeof(ptFCh[0][0]);
+
+	//GT offset from the peak of the distribution
+	int xoffset = p.center[0].x;
+	int yoffset = p.center[0].y;
+
+	int x, y, cx, cy; // x,y top left; cx,cy center of patch
+	cy = yoffset;
+	cx = xoffset;
+	for (unsigned int c = 0; c<p.vPatch.size(); ++c)
+		ptFCh_row[c] = &ptFCh[c][0];
+	// regression for a single patch
+	vector<const LeafNode*> result;
+	crForest->regression(result, ptFCh_row, stepImg);
+	float se = 0; //Square error of current patch on all availabe trees
+	float cmean = 0;
+	int numpt = 0;
+	// vote for all trees (leafs) itL == iterator for Leafs
+	for (vector<const LeafNode*>::const_iterator itL = result.begin(); itL != result.end(); ++itL) {
+		// To speed up the voting, one can vote only for patches 
+		// with a probability for foreground > 0.5
+		// 
+		//if((*itL)->pfg>0.5) {
+		
+		// voting weight for leaf 
+		float w = (*itL)->pfg / float((*itL)->vCenter.size() * result.size());
+		cmean += w;
+		// vote for all points stored in the leaf it == iterator for all points in leaf
+		for (vector<vector<CvPoint> >::const_iterator it = (*itL)->vCenter.begin(); it != (*itL)->vCenter.end(); ++it) {
+			for (int c = 0; c<(int)ratios.size(); ++c) { //for all scales
+				int dx = int(cx - (*it)[0].x * ratios[c] + 0.5);
+				int dy = int(cy - (*it)[0].y * ratios[c] + 0.5);
+				se += w*(dx ^ 2 + dy ^ 2); // aggregating the square error of this patch on all trees
+				numpt++;
+			}
+		}
+		// } // end if
+	}
+	double rmse = sqrt(se / numpt); // normalizing the square error with n to get MSE and retreive the root to get RMSE
+	//if heap is either full or current patch is worst than all other patches in the heap take out the lower push it in
+	p.err = rmse;
+	p.cmean = cmean;
+	if (!p.fg){ //negative example
+		if (neg_bad_examples.size() < k || neg_bad_examples.top().cmean<p.cmean){
+			if (neg_bad_examples.size() == k) neg_bad_examples.pop();
+			neg_bad_examples.push(p);
+		}
+	}
+	else{ //positive example
+		if (pos_bad_examples.size() < k || pos_bad_examples.top().err<p.err){
+			if (pos_bad_examples.size() == k) pos_bad_examples.pop();
+				pos_bad_examples.push(p);
+			}
+		}
+	// increase pointer - x
+	for (unsigned int c = 0; c<p.vPatch.size(); ++c)
+		++ptFCh_row[c];
+	// increase pointer - y
+	for (unsigned int c = 0; c<p.vPatch.size(); ++c)
+		ptFCh[c] += stepImg;
+	// release feature channels
+	delete[] ptFCh;
+	delete[] ptFCh_row;
+}
+
 void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& vImgDetect, std::vector<float>& ratios,const char* imfile) {	
 
 	if(img->nChannels==1) {
@@ -135,7 +210,19 @@ void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& 
 
 }
 
+void CRForestDetector::detectPyramidcascade(PatchFeature& p, priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& pos_bad_examples,priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& neg_bad_examples, int k, std::vector<float>& ratios) {
 
+	cout << "Timer" << endl;
+	int tstart = clock();
+	// if you'd like a ratio insert you'll have to figure out how to resize vPatches of PatchFeature
+	//for (int i = 0; i<int(ratios.size()); ++i) {
+		// detection
+		detectColorcascade(p, pos_bad_examples, neg_bad_examples, k, ratios);
+	//}
+
+	cout << "Time " << (double)(clock() - tstart) / CLOCKS_PER_SEC << " sec" << endl;
+
+}
 
 
 

@@ -464,6 +464,32 @@ void detect(CRForestDetector& crDetect) {
 	}
 
 }
+
+// Run detector cascade
+void detectcascade(CRForestDetector& crDetect,CRPatch& Train,CRPatch& NewTrain) {
+
+	// Storage for output
+	priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature> pos_bd_exp; //heap for postive training patches for next phase
+	priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature> neg_bd_exp; //heap for negative training patches for next phase
+	int k = Train.vLPatches[0].size() / 2; //number of examples to keep in each heap
+
+	// Run detector for all patches
+	for (unsigned int i = 0; i < Train.vLPatches.size(); ++i){
+		for (vector<PatchFeature>::iterator it = Train.vLPatches[i].begin(); it != Train.vLPatches[i].end(); ++it) {
+			// Detection for all scales - if more than 1 scale needs to re-write this
+			crDetect.detectPyramidcascade((*it), pos_bd_exp, neg_bd_exp, k, ratios);
+		}
+	}
+	// update Train - pos
+	while (!pos_bd_exp.empty()){
+		NewTrain.vLPatches[1].push_back(pos_bd_exp.top());
+	}
+	// update Train - pos
+	while (!neg_bd_exp.empty()){
+		NewTrain.vLPatches[0].push_back(neg_bd_exp.top());
+	}
+
+}
 	
 // Extract patches from training data
 void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
@@ -714,6 +740,80 @@ void run_train() {
 
 }
 
+void run_cascade() {
+	int EXPHASENUM = 3;
+//train #1
+
+	// Init forest with number of trees divided by (extra phase number + 1) - must be int!
+	CRForest crForest(ntrees / EXPHASENUM);
+
+	// Init random generator
+	time_t t = time(NULL);
+	int seed = (int)t;
+
+	CvRNG cvRNG(seed);
+
+	// Create directory
+	string tpath(treepath);
+	tpath.erase(tpath.find_last_of(PATH_SEP));
+	if (!DirectoryExists(tpath.c_str())){
+		string execstr = "mkdir ";
+		execstr += tpath;
+		system(execstr.c_str());
+	}
+
+	// Init training data
+	CRPatch Train(&cvRNG, p_width, p_height, 2);
+
+	// Extract training patches
+	extract_Patches(Train, &cvRNG);
+
+	// Train forest
+	crForest.trainForest(20, 15, &cvRNG, Train, 2000);
+
+	// Save forest
+	crForest.saveForest(treepath.c_str(), off_tree);
+	crForest.~CRForest();
+
+//end train #1	
+
+	//now runing detect on training samples and train on the worst detected trainsamples 
+	for (int i = 1; i < EXPHASENUM; i++){
+		//set size for the next samples
+		char suf[40];
+		sprintf_s(suf,"phase_%d.txt", i);
+
+		// Init forest with number of trees
+		CRForest crForest(i*(ntrees / EXPHASENUM));
+		off_tree = i*(ntrees / EXPHASENUM)-1;
+		// Load forest
+		crForest.loadForest(treepath.c_str());
+
+		// Init detector and newTrain
+		CRForestDetector crDetect(&crForest, p_width, p_height);
+		cout << "finishd detecting Phase: " << i << endl;
+		CRPatch NewTrain(&cvRNG, p_width, p_height, 2);
+		
+		// run detector
+		detectcascade(crDetect,Train,NewTrain);
+		// need to write a function that does this  - TODO
+		float sum_of_errors = 0;
+		float cls_conf_neg = 0;
+		float cls_conf_pos = 0;
+
+		// delete structures
+		Train.~CRPatch();
+		CRPatch Train = NewTrain; // init Train for next iter
+		NewTrain.~CRPatch();
+		crForest.~CRForest();
+		//Train new part of the forest 
+		CRForest crForest1((ntrees / EXPHASENUM));
+		crForest1.trainForest(20, 15, &cvRNG, Train, 2000);
+		crForest1.saveForest(treepath.c_str(), off_tree);
+
+	}
+}
+
 void run_post(int sigmaSup = 9) {
 
 
@@ -747,7 +847,7 @@ void run_post(int sigmaSup = 9) {
 		GaussianBlur(imgdbl, blur, Size(9, 9), 2, 2);
 		double med=medianMat(blur, pow(2, 16));
 		Mat blurth;
-		blur.copyTo(blurth, (blur >= med)); //TODO - check that this works
+		blur.copyTo(blurth, (blur >= med)); 
 		Mat diff = abs(blur - blurth);
 		// Non-maximal suppression
 		nonMaximaSuppression(blur, sigmaSup, nmsmat, Mat());
@@ -790,7 +890,7 @@ int main(int argc, char* argv[])
 	// Check argument
 	if(argc<2) {
 		cout << "Usage: CRForest-Detector.exe mode [config.txt] [tree_offset]" << endl;
-		cout << "mode: 0 - train; 1 - show; 2 - detect" << endl;
+		cout << "mode: 0 - train; 1 - show; 2 - detect; 3 - post; 4 - cascade " << endl;
 		cout << "tree_offset: output number for trees" << endl;
 		cout << "Load default: mode - 2" << endl; 
 	} else
@@ -823,6 +923,12 @@ int main(int argc, char* argv[])
 		case 3:
 		//post processing: 1. Non-maximal supression 2. Gaussian Kernel convolution
 			run_post();
+			break;
+
+		case 4:
+			//Running cascade learning where first batch (3rd) is trained on all trainig samples
+			//next is only on hard training (half trainset) samples and next on hardest (half of half)
+			run_cascade();
 			break;
 		
 

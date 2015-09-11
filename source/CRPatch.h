@@ -13,6 +13,7 @@
 #include <vector>
 #include <iostream>
 
+
 #include "HoG.h"
 
 // structure for image patch
@@ -21,13 +22,29 @@ struct PatchFeature {
 
 	CvRect roi;
 	std::vector<CvPoint> center;
-
 	std::vector<CvMat*> vPatch;
+	bool fg;
+	double err;
+	double cmean;
+
 	void print() const {
 		std::cout << roi.x << " " << roi.y << " " << roi.width << " " << roi.height;
 		for(unsigned int i=0; i<center.size(); ++i) std::cout << " " << center[i].x << " " << center[i].y; std::cout << std::endl;
 	}
 	void show(int delay) const;
+};
+
+struct LessThanFeature {
+	bool operator() (const PatchFeature& p1, const PatchFeature& p2) const {
+		try{
+			if (p1.fg && p2.fg) return (p1.err > p2.err);
+			else if (!p1.fg && !p2.fg) return (p1.cmean > p2.cmean);
+			else throw 2;
+		}
+		catch (int e){
+			std::cout << "You're mixing forground and background patches in Cascade!" << std::endl;
+		}
+	}
 };
 
 static HoG hog; 
