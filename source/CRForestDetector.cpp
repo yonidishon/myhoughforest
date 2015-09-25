@@ -115,26 +115,27 @@ void CRForestDetector::detectColorcascade(PatchFeature& p, priority_queue<PatchF
 	int stepImg;
 	uchar** ptFCh = new uchar*[p.vPatch.size()];
 	uchar** ptFCh_row = new uchar*[p.vPatch.size()];
-	for (unsigned int c = 0; c<p.vPatch.size(); ++c) {
+	for (unsigned int c = 0; c < p.vPatch.size(); ++c) {
 		cvGetRawData(p.vPatch[c], (uchar**)&(ptFCh[c]), &stepImg);
 	}
 	stepImg /= sizeof(ptFCh[0][0]);
 
 	//GT offset from the peak of the distribution
-	int xoffset = p.center[0].x;
-	int yoffset = p.center[0].y;
+	int x, y, cx, cy;// x,y top left; 
+	if (p.fg){
+		//cx, cy center of patch
+		cx = p.center[0].x;
+		cy = p.center[0].y;
+	}
 
-	int x, y, cx, cy; // x,y top left; cx,cy center of patch
-	cy = yoffset;
-	cx = xoffset;
 	for (unsigned int c = 0; c<p.vPatch.size(); ++c)
 		ptFCh_row[c] = &ptFCh[c][0];
 	// regression for a single patch
 	vector<const LeafNode*> result;
 	crForest->regression(result, ptFCh_row, stepImg);
 	float se = 0; //Square error of current patch on all availabe trees
-	float cmean = 0;
-	int numpt = 0;
+	float cmean = 0; //"Class Mean": Probability of being foreground according to the leaf arrived to.
+	int numpt = 0; // number of points in a specific leaf
 	// vote for all trees (leafs) itL == iterator for Leafs
 	for (vector<const LeafNode*>::const_iterator itL = result.begin(); itL != result.end(); ++itL) {
 		// To speed up the voting, one can vote only for patches 
@@ -142,21 +143,27 @@ void CRForestDetector::detectColorcascade(PatchFeature& p, priority_queue<PatchF
 		// 
 		//if((*itL)->pfg>0.5) {
 		
-		// voting weight for leaf 
+		// voting weight for each point in current leaf 
 		float w = (*itL)->pfg / float((*itL)->vCenter.size() * result.size());
-		cmean += w;
-		// vote for all points stored in the leaf it == iterator for all points in leaf
-		for (vector<vector<CvPoint> >::const_iterator it = (*itL)->vCenter.begin(); it != (*itL)->vCenter.end(); ++it) {
-			for (int c = 0; c<(int)ratios.size(); ++c) { //for all scales
-				int dx = int(cx - (*it)[0].x * ratios[c] + 0.5);
-				int dy = int(cy - (*it)[0].y * ratios[c] + 0.5);
-				se += w*(dx ^ 2 + dy ^ 2); // aggregating the square error of this patch on all trees
-				numpt++;
+
+		cmean += ((*itL)->pfg)*(float((*itL)->vCenter.size()));
+		numpt += ((*itL)->vCenter.size());
+		if (p.fg){
+			// vote for all points stored in the leaf it == iterator for all points in leaf
+			for (vector<vector<CvPoint> >::const_iterator it = (*itL)->vCenter.begin(); it != (*itL)->vCenter.end(); ++it) {
+				for (int c = 0; c < (int)ratios.size(); ++c) { //for all scales
+					int dx = int(cx - (*it)[0].x * ratios[c] + 0.5);
+					int dy = int(cy - (*it)[0].y * ratios[c] + 0.5);
+					// cout << "dx is: " << dx << " dy is: " << dy << endl;
+					// cout << "Weighted Square error: " << w*(pow(dx, 2) + pow(dy, 2)) << endl;
+					se += w*(pow(dx,2) + pow(dy,2)); // aggregating the square error of this patch on all trees
+				}
 			}
 		}
 		// } // end if
 	}
-	double rmse = sqrt(se / numpt); // normalizing the square error with n to get MSE and retreive the root to get RMSE
+	float rmse = sqrt(se / float(numpt)); // normalizing the square error with n to get MSE and retreive the root to get RMSE
+	cmean = cmean / float(numpt); //average class decision calculated as a weighted average between trees (with points arrived to each leaf as a bais)
 	//if heap is either full or current patch is worst than all other patches in the heap take out the lower push it in
 	p.err = rmse;
 	p.cmean = cmean;

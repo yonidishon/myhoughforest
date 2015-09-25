@@ -31,7 +31,7 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 	unsigned int offset = vLPatches[label].size();
 	vLPatches[label].reserve(offset + n);
 	for (unsigned int i = 0; i<n; ++i) {
-		CvPoint pt = *(CvPoint*)cvPtr1D(locations, i, 0);
+		CvPoint pt = *(CvPoint*)cvPtr1D(locations, i, 0);//transforming the generated locations to 1D array pt
 
 		PatchFeature pf;
 		vLPatches[label].push_back(pf);
@@ -44,7 +44,7 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 			// saving the offset from the peak of distribution for all channels @ center.x/y
 			vLPatches[label].back().center.resize(vCenter->size());
 			for (unsigned int c = 0; c<vCenter->size(); ++c) {
-				vLPatches[label].back().center[c].x = pt.x + offx - (*vCenter)[c].x;
+				vLPatches[label].back().center[c].x = pt.x + offx - (*vCenter)[c].x;//vCenter is the center of the GT patch
 				vLPatches[label].back().center[c].y = pt.y + offy - (*vCenter)[c].y;
 			}
 		}

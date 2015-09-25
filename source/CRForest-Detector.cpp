@@ -482,11 +482,15 @@ void detectcascade(CRForestDetector& crDetect,CRPatch& Train,CRPatch& NewTrain) 
 	}
 	// update Train - pos
 	while (!pos_bd_exp.empty()){
-		NewTrain.vLPatches[1].push_back(pos_bd_exp.top());
+		PatchFeature p = pos_bd_exp.top();
+		NewTrain.vLPatches[1].push_back(p);
+		pos_bd_exp.pop();
 	}
 	// update Train - pos
 	while (!neg_bd_exp.empty()){
-		NewTrain.vLPatches[0].push_back(neg_bd_exp.top());
+		PatchFeature p = neg_bd_exp.top();
+		NewTrain.vLPatches[0].push_back(p);
+		neg_bd_exp.pop();
 	}
 
 }
@@ -740,6 +744,23 @@ void run_train() {
 
 }
 
+void print_error_of_training(CRPatch& Train){
+	float rmse = 0;
+	float pos_conf = 0;
+	float neg_conf = 0;
+
+	for (int i = 0; i < Train.vLPatches.size(); i++){
+		for (vector<PatchFeature>::const_iterator it = (Train.vLPatches[i]).begin(); it != (Train.vLPatches[i]).end(); ++it){
+			rmse += (*it).err;
+			if (i == 0) neg_conf += (*it).cmean;
+			else pos_conf += (*it).cmean;
+		}
+		if (i == 0)	cout << "Confidence in negative is: " << std::to_string(neg_conf / (Train.vLPatches[i]).size()) << endl;
+		else cout << "Confidence in negative is: " << std::to_string(pos_conf / (Train.vLPatches[i]).size()) << endl;
+	}
+	cout << "RMSE is: " << std::to_string(sqrt(rmse / ((Train.vLPatches[1]).size()))) << endl;
+}
+
 void run_cascade() {
 	int EXPHASENUM = 3;
 //train #1
@@ -772,7 +793,7 @@ void run_cascade() {
 	crForest.trainForest(20, 15, &cvRNG, Train, 2000);
 
 	// Save forest
-	crForest.saveForest(treepath.c_str(), off_tree);
+	//Forest.saveForest(treepath.c_str(), off_tree);
 	crForest.~CRForest();
 
 //end train #1	
@@ -783,7 +804,7 @@ void run_cascade() {
 		char suf[40];
 		sprintf_s(suf,"phase_%d.txt", i);
 
-		// Init forest with number of trees
+		// Init forest with number of trees TODO - needs to check thes line
 		CRForest crForest(i*(ntrees / EXPHASENUM));
 		off_tree = i*(ntrees / EXPHASENUM)-1;
 		// Load forest
@@ -791,16 +812,14 @@ void run_cascade() {
 
 		// Init detector and newTrain
 		CRForestDetector crDetect(&crForest, p_width, p_height);
-		cout << "finishd detecting Phase: " << i << endl;
+
 		CRPatch NewTrain(&cvRNG, p_width, p_height, 2);
 		
 		// run detector
 		detectcascade(crDetect,Train,NewTrain);
-		// need to write a function that does this  - TODO
-		float sum_of_errors = 0;
-		float cls_conf_neg = 0;
-		float cls_conf_pos = 0;
-
+		cout << "finishd detecting Phase: " << i << endl;
+		print_error_of_training(Train);
+	
 		// delete structures
 		Train.~CRPatch();
 		CRPatch Train = NewTrain; // init Train for next iter
@@ -809,7 +828,7 @@ void run_cascade() {
 		//Train new part of the forest 
 		CRForest crForest1((ntrees / EXPHASENUM));
 		crForest1.trainForest(20, 15, &cvRNG, Train, 2000);
-		crForest1.saveForest(treepath.c_str(), off_tree);
+	//	crForest1.saveForest(treepath.c_str(), off_tree);
 
 	}
 }
@@ -836,7 +855,7 @@ void run_post(int sigmaSup = 9) {
 			cout << "Could not load image file: " << (impath + "/" + vFilenames[i]).c_str() << endl;
 			exit(-1);
 		}
-		//TODO!
+		//TODO (old)!
 		// Scalar mean, std;
 		// meanStdDev(cvarrToMat(img), mean, std);
 		//if (mean < 255 / 4) || std < 20 
