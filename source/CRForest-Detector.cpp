@@ -755,8 +755,8 @@ void print_error_of_training(CRPatch& Train){
 			if (i == 0) neg_conf += (*it).cmean;
 			else pos_conf += (*it).cmean;
 		}
-		if (i == 0)	cout << "Confidence in negative is: " << std::to_string(neg_conf / (Train.vLPatches[i]).size()) << endl;
-		else cout << "Confidence in negative is: " << std::to_string(pos_conf / (Train.vLPatches[i]).size()) << endl;
+		if (i == 0)	cout << "Confidence in negative is: " << std::to_string(1-(neg_conf / (Train.vLPatches[i]).size())) << endl;
+		else cout << "Confidence in positive is: " << std::to_string(pos_conf / (Train.vLPatches[i]).size()) << endl;
 	}
 	cout << "RMSE is: " << std::to_string(sqrt(rmse / ((Train.vLPatches[1]).size()))) << endl;
 }
@@ -766,7 +766,8 @@ void run_cascade() {
 //train #1
 
 	// Init forest with number of trees divided by (extra phase number + 1) - must be int!
-	CRForest crForest(ntrees / EXPHASENUM);
+	CRForest* crForest;
+	crForest = new CRForest(ntrees / EXPHASENUM);
 
 	// Init random generator
 	time_t t = time(NULL);
@@ -784,53 +785,60 @@ void run_cascade() {
 	}
 
 	// Init training data
-	CRPatch Train(&cvRNG, p_width, p_height, 2);
+	CRPatch* Train;
+	Train = new CRPatch(&cvRNG, p_width, p_height, 2);
 
 	// Extract training patches
-	extract_Patches(Train, &cvRNG);
+	extract_Patches(*Train, &cvRNG);
 
 	// Train forest
-	crForest.trainForest(20, 15, &cvRNG, Train, 2000);
+	crForest->trainForest(20, 15, &cvRNG, *Train, 2000);
 
 	// Save forest
-	//Forest.saveForest(treepath.c_str(), off_tree);
-	crForest.~CRForest();
+	crForest->saveForest(treepath.c_str(), off_tree);
+	delete crForest;
 
 //end train #1	
 
-	//now runing detect on training samples and train on the worst detected trainsamples 
+	//now:
+	//1. run detect on training samples
+	//2. run train on the worst detected trainsamples
+	//3. save the forset
+	//4. pass new train exmples to next round
+	CRPatch* NewTrain;
 	for (int i = 1; i < EXPHASENUM; i++){
 		//set size for the next samples
 		char suf[40];
 		sprintf_s(suf,"phase_%d.txt", i);
 
-		// Init forest with number of trees TODO - needs to check thes line
-		CRForest crForest(i*(ntrees / EXPHASENUM));
+		// Init forest sttructure for detection with number of trees TODO - needs to check thes line
+		crForest = new CRForest(i*(ntrees / EXPHASENUM));
 		off_tree = i*(ntrees / EXPHASENUM)-1;
-		// Load forest
-		crForest.loadForest(treepath.c_str());
+		// Load forest from path:treepath
+		crForest->loadForest(treepath.c_str());
 
 		// Init detector and newTrain
-		CRForestDetector crDetect(&crForest, p_width, p_height);
-
-		CRPatch NewTrain(&cvRNG, p_width, p_height, 2);
+		CRForestDetector crDetect(crForest, p_width, p_height);
+		NewTrain = new CRPatch(&cvRNG, p_width, p_height, 2);
 		
-		// run detector
-		detectcascade(crDetect,Train,NewTrain);
+		//1. run detector and create new hard-negative (weak positives and weak negatives) samples (currently 1/2 of the training set each time)
+ 		detectcascade(crDetect,*Train,*NewTrain);
 		cout << "finishd detecting Phase: " << i << endl;
-		print_error_of_training(Train);
+		print_error_of_training(*Train);
 	
 		// delete structures
-		Train.~CRPatch();
-		CRPatch Train = NewTrain; // init Train for next iter
-		NewTrain.~CRPatch();
-		crForest.~CRForest();
-		//Train new part of the forest 
+		delete Train;
+		//4.
+		Train = NewTrain; // init Train for next iter
+		delete crForest; //delete crFroest
+		//2. Train new part of the forest 
 		CRForest crForest1((ntrees / EXPHASENUM));
-		crForest1.trainForest(20, 15, &cvRNG, Train, 2000);
-	//	crForest1.saveForest(treepath.c_str(), off_tree);
+		crForest1.trainForest(20, 15, &cvRNG, *Train, 2000);
+		//3.
+		crForest1.saveForest(treepath.c_str(), off_tree);
 
 	}
+	delete NewTrain;
 }
 
 void run_post(int sigmaSup = 9) {
