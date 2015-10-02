@@ -813,7 +813,7 @@ void run_cascade() {
 
 		// Init forest sttructure for detection with number of trees TODO - needs to check thes line
 		crForest = new CRForest(i*(ntrees / EXPHASENUM));
-		off_tree = i*(ntrees / EXPHASENUM)-1;
+		off_tree = i*(ntrees / EXPHASENUM);
 		// Load forest from path:treepath
 		crForest->loadForest(treepath.c_str());
 
