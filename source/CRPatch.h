@@ -47,6 +47,19 @@ struct LessThanFeature {
 	}
 };
 
+// structure for image patch for negative mining
+struct PatchHardMining {
+	PatchHardMining() {}
+	char* patchpath;
+	double cmean;
+};
+
+struct LessThanPatchHardMining {
+	bool operator() (const PatchHardMining& p1, const PatchHardMining& p2) const {
+		return (p1.cmean > p2.cmean);
+	}
+};
+
 static HoG hog; 
 
 class CRPatch {

@@ -9,7 +9,7 @@
 
 using namespace std;
 
-
+// DETECTORS
 void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect, std::vector<float>& ratios,const char* imfile) {
 
 	// extract features
@@ -108,6 +108,94 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 
 }
 
+void CRForestDetector::detectColorHardNeg(IplImage* img, priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining>& pos_bad_examples,
+	vector<float>& ratios, const char* imfile, const char* filename, vector<CvRect>& vBBox, vector<vector<CvPoint> >& vCenter, int max_neg_samples) {
+	//imfile is the full path to the image *img
+
+	// extract features
+	vector<IplImage*> vImg;
+	//CRPatch::extractFeatureChannels(img, vImg);
+	CRPatch::extractFeatureChannelsExtra(img, vImg, imfile);
+	int neg_samples_counter = 0;
+	// get pointers to feature channels
+	int stepImg;
+	uchar** ptFCh = new uchar*[vImg.size()];
+	uchar** ptFCh_row = new uchar*[vImg.size()];
+	for (unsigned int c = 0; c<vImg.size(); ++c) {
+		cvGetRawData(vImg[c], (uchar**)&(ptFCh[c]), &stepImg);
+	}
+	stepImg /= sizeof(ptFCh[0][0]);
+
+	int xoffset = width/2;
+	int yoffset = height/2;
+
+	int x, y, cx, cy; // x,y top left; cx,cy center of patch
+	cy = yoffset;
+
+	for (y = 0; y< (img->height - height); ++y, ++cy) {
+		// Get start of row
+		for (unsigned int c = 0; c<vImg.size(); ++c)
+			ptFCh_row[c] = &ptFCh[c][0];
+		cx = xoffset;
+
+		for (x = 0; x < img->width - width; ++x, ++cx) {
+
+
+			// regression for a single patch
+			vector<const LeafNode*> result;
+			crForest->regression(result, ptFCh_row, stepImg);
+			float cmean = 0; //"Class Mean": Probability of being foreground according to the leaf arrived to.
+			int numpt = 0; // number of points in a specific leaf
+
+			// vote for all trees (leafs) *itL is a leaf <itL>
+			for (vector<const LeafNode*>::const_iterator itL = result.begin(); itL != result.end(); ++itL) {
+
+				// To speed up the voting, one can vote only for patches 
+				// with a probability for foreground > 0.5
+				// 
+				//if((*itL)->pfg>0.5) {
+
+				// voting weight for leaf  (vCenter.Size is number of training patches got to this leaft)
+				//							(result.size is the number of trees in the forest
+				cmean += (*itL)->pfg / float((*itL)->vCenter.size() * result.size());
+				numpt += (*itL)->vCenter.size();
+				// vote for all points stored in the leaf ->  *it is a point <it> in the leaf 
+				// } // end if
+			}
+			cmean = cmean / float(numpt); //average class decision calculated as a weighted average between trees (with points arrived to each leaf as a bais)
+			//if heap is either full or current patch is worst than all other patches in the heap take out the lower push it in
+			if (!isinposrect(CvRect(vBBox[0].x, vBBox[0].y, vBBox[0].width, vBBox[0].height),CvPoint(x, y))){//TODO condition for patch to be negative - write a function to detect if a patch has more of it's 75% of it's area in the positive vbbox)			
+				if (pos_bad_examples.size() < max_neg_samples || pos_bad_examples.top().cmean<cmean){
+					if (pos_bad_examples.size() == max_neg_samples) pos_bad_examples.pop();
+					char buffer[100];
+					sprintf(buffer, "%s %i %i %i %i", filename, x, y, x + width-1, y + height-1);
+					PatchHardMining *neg_patch = new PatchHardMining();
+					neg_patch->patchpath = buffer;
+					neg_patch->cmean = cmean;
+					pos_bad_examples.push(*neg_patch);
+				}
+
+			}
+			// increase pointer - x
+			for (unsigned int c = 0; c<vImg.size(); ++c)
+				++ptFCh_row[c];
+
+		} // end for x
+
+		// increase pointer - y
+		for (unsigned int c = 0; c<vImg.size(); ++c)
+			ptFCh[c] += stepImg;
+
+	} // end for y 	
+
+	// release feature channels
+	for (unsigned int c = 0; c<vImg.size(); ++c)
+		cvReleaseImage(&vImg[c]);
+
+	delete[] ptFCh;
+	delete[] ptFCh_row;
+}
+
 void CRForestDetector::detectColorcascade(PatchFeature& p, priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& pos_bad_examples,
 	priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& neg_bad_examples, int k, std::vector<float>& ratios) {
 
@@ -190,6 +278,7 @@ void CRForestDetector::detectColorcascade(PatchFeature& p, priority_queue<PatchF
 	delete[] ptFCh_row;
 }
 
+// PYRAMIDS
 void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& vImgDetect, std::vector<float>& ratios,const char* imfile) {	
 
 	if(img->nChannels==1) {
@@ -217,6 +306,33 @@ void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& 
 
 }
 
+void CRForestDetector::detectPyramidhard(IplImage *img, std::vector<float>& scales, std::vector<float>& ratios, const char *imfile, priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining>& neg_examples, const char *filename, vector<CvRect>& vBBox, vector<vector<CvPoint>>& vCenter, int max_neg_samples) {
+	if (img->nChannels == 1) {
+
+		std::cerr << "gray color images are not supported." << std::endl;
+
+	}
+	else { // color
+
+		cout << "Timer" << endl;
+		int tstart = clock();
+
+		for (int i = 0; i<int(scales.size()); ++i) {
+			//mockup image just for the resize
+			IplImage* cLevel = cvCreateImage(cvSize(int(img->width*scales[i] + 0.5), int(img->height*scales[i] + 0.5)), IPL_DEPTH_8U, 3);
+			cvResize(img, cLevel, CV_INTER_LINEAR);
+
+			// detection
+			detectColorHardNeg(img, neg_examples, ratios, imfile, filename, vBBox, vCenter, max_neg_samples);
+
+			cvReleaseImage(&cLevel);
+		}
+
+		cout << "Time " << (double)(clock() - tstart) / CLOCKS_PER_SEC << " sec" << endl;
+
+	}
+}
+
 void CRForestDetector::detectPyramidcascade(PatchFeature& p, priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& pos_bad_examples,priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& neg_bad_examples, int k, std::vector<float>& ratios) {
 
 	cout << "Timer" << endl;
@@ -229,6 +345,12 @@ void CRForestDetector::detectPyramidcascade(PatchFeature& p, priority_queue<Patc
 
 	cout << "Time " << (double)(clock() - tstart) / CLOCKS_PER_SEC << " sec" << endl;
 
+}
+// HELPERS
+bool CRForestDetector::isinposrect(CvRect& BB, CvPoint& l_cor){
+	cv::Rect2d rect(BB.x, BB.y, BB.width - width, BB.height - height);//smaller BB to check if the left point of patch is contained within (positive patch)
+	if (rect.contains(l_cor)) return true;
+	return false;
 }
 
 

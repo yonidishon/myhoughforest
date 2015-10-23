@@ -1,0 +1,44 @@
+/* 
+// Author: Juergen Gall, BIWI, ETH Zurich
+// Email: gall@vision.ee.ethz.ch
+*/
+
+#pragma once
+
+#include "CRForest.h"
+#include <ctime>
+#include <queue>
+#include <opencv2/core/core.hpp>
+
+
+class CRForestDetector {
+public:
+	// Constructor
+	CRForestDetector(const CRForest* pRF, int w, int h) : crForest(pRF), width(w), height(h)  {}
+
+	// detect multi scale
+	void detectPyramid(IplImage *img, std::vector<std::vector<IplImage*> >& imgDetect, std::vector<float>& ratios,const char* imfile);
+	void CRForestDetector::detectPyramidcascade(PatchFeature& p, std::priority_queue<PatchFeature, std::vector<PatchFeature>,
+		LessThanFeature>& pos_bad_examples, priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& neg_bad_examples, int k, std::vector<float>& ratios);
+	
+	void CRForestDetector::detectPyramidhard(IplImage *img, vector<float>& scales, vector<float>& ratios, const char* imfile, std::priority_queue<PatchHardMining, vector<PatchHardMining>,
+		LessThanPatchHardMining>& neg_examples, const char* posfile, vector<CvRect>& vBBox, vector<vector<CvPoint> >& vCenter, int max_neg_samples);
+
+	// Get/Set functions
+	unsigned int GetNumCenter() const {return crForest->GetNumCenter();}
+	//For hard negative mining - check if a feature patch is inside the positive BB
+	bool isinposrect(cv::Rect& BB, cv::Point& l_cor);
+
+private:
+	void detectColor(IplImage *img, std::vector<IplImage*>& imgDetect, std::vector<float>& ratios, const char* imfile);
+	void detectColorcascade(PatchFeature& p, std::priority_queue<PatchFeature, std::vector<PatchFeature>, LessThanFeature>& pos_bad_examples,
+		std::priority_queue<PatchFeature, std::vector<PatchFeature>, LessThanFeature>& neg_bad_examples, int k, std::vector<float>& ratios);
+	void detectColorHardNeg(IplImage *img, std::priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining>& pos_bad_examples,
+		vector<float>& ratios, const char* imfile, const char* filename, vector<CvRect>& vBBox, vector<vector<CvPoint> >& vCenter, int max_neg_samples);
+
+	const CRForest* crForest;
+	int width;
+	int height;
+};
+
+

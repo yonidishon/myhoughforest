@@ -102,6 +102,10 @@ int out_scale;
 string trainpospath;
 // File with postive examples
 string trainposfiles;
+// File with postive regions for hard negative mining
+string trainposfilessub;
+// number of maximum hard negative per frame
+int MAX_NEG_PER_IMAGE;
 // Subset of positive images -1: all images
 int subsamples_pos;
 // Sample patches from pos. examples
@@ -215,6 +219,15 @@ void loadConfig(const char* filename, int mode) {
 		// Samples from pos. examples
 		in.getline(buffer,400);
 		in >> samples_neg;
+		in.getline(buffer, 400);
+		// TODO - these line will probably rise an exception.
+		// Pos regions for different comps //Yonatan: hard negative mining.
+		in.getline(buffer, 400);
+		in >> trainposfilessub;
+		in.getline(buffer, 400);
+		// max hard negative per image //Yonatan: hard negative mining. 
+		in.getline(buffer, 400);
+		in >> MAX_NEG_PER_IMAGE;
 		//in.getline(buffer,400);
 
 	} else {
@@ -223,7 +236,7 @@ void loadConfig(const char* filename, int mode) {
 	}
 	in.close();
 
-	switch ( mode ) { 
+	switch ( mode ) { // 0 - Training,1 - Show, 2 - Detect, 3 - Post Processing, 4 - Hard negative/Cascade
 		case 0:
 		cout << endl << "------------------------------------" << endl << endl;
 		cout << "Training:         " << endl;
@@ -242,6 +255,20 @@ void loadConfig(const char* filename, int mode) {
 		cout << endl << "------------------------------------" << endl << endl;
 		cout << "Show:             " << endl;
 		cout << "Trees:            " << ntrees << " " << treepath << endl;
+		cout << endl << "------------------------------------" << endl << endl;
+		break;
+
+		case 4: // TODO - need to choose file to write to , and orginize the data
+		cout << endl << "------------------------------------" << endl << endl;
+		cout << "Detection:        " << endl;
+		cout << "Trees:            " << ntrees << " " << treepath << endl;
+		cout << "Patches:          " << p_width << " " << p_height << endl;
+		cout << "Images:           " << impath << endl;
+		cout << "                  " << imfiles << endl;
+		cout << "Scales:           "; for (unsigned int i = 0; i<scales.size(); ++i) cout << scales[i] << " "; cout << endl;
+		cout << "Ratios:           "; for (unsigned int i = 0; i<ratios.size(); ++i) cout << ratios[i] << " "; cout << endl;
+		cout << "Extract Features: " << xtrFeature << endl;
+		cout << "Output:           " << out_scale << " " << outpath << endl;
 		cout << endl << "------------------------------------" << endl << endl;
 		break;
 
@@ -331,6 +358,54 @@ void loadTrainPosFile(std::vector<string>& vFilenames, std::vector<CvRect>& vBBo
 		in.close();
 	} else {
 		cerr << "File not found " << trainposfiles.c_str() << endl;
+		exit(-1);
+	}
+}
+
+// load positive training image filenames
+void loadTrainPosFilesub(std::vector<string>& vFilenames, std::vector<CvRect>& vBBox, std::vector<std::vector<CvPoint> >& vCenter) {
+
+	unsigned int size, numop;
+	ifstream in(trainposfilessub.c_str());
+
+	if (in.is_open()) {
+		in >> size;
+		in >> numop;
+		cout << "Load Train Pos Examples: " << size << " - " << numop << endl;
+
+		vFilenames.resize(size);
+		vCenter.resize(size);
+		vBBox.resize(size);
+
+		for (unsigned int i = 0; i<size; ++i) {
+			// Read filename
+			in >> vFilenames[i];
+
+			// Read bounding box
+			in >> vBBox[i].x; in >> vBBox[i].y;
+			in >> vBBox[i].width;
+			vBBox[i].width -= vBBox[i].x;
+			in >> vBBox[i].height;
+			vBBox[i].height -= vBBox[i].y;
+
+			if (vBBox[i].width<p_width || vBBox[i].height<p_height) {
+				cout << "Width or height are too small" << endl;
+				cout << vFilenames[i] << endl;
+				exit(-1);
+			}
+
+			// Read center points
+			vCenter[i].resize(numop);
+			for (unsigned int c = 0; c<numop; ++c) {
+				in >> vCenter[i][c].x;
+				in >> vCenter[i][c].y;
+			}
+		}
+
+		in.close();
+	}
+	else {
+		cerr << "File not found " << trainposfilessub.c_str() << endl;
 		exit(-1);
 	}
 }
@@ -465,7 +540,7 @@ void detect(CRForestDetector& crDetect) {
 
 }
 
-// Run detector cascade
+// Run detector cascade (only single core and all patches are from the initial sampling)
 void detectcascade(CRForestDetector& crDetect,CRPatch& Train,CRPatch& NewTrain) {
 
 	// Storage for output
@@ -494,7 +569,63 @@ void detectcascade(CRForestDetector& crDetect,CRPatch& Train,CRPatch& NewTrain) 
 	}
 
 }
+
+// detector for Hard negative (for distrbuting computing + all the patches in the image count)
+// needs to maintain a heap with hardest negatives and write it to disk
+void detect_hardneg(CRForestDetector& crDetect) {
 	
+
+	vector<string> posvFilenames;
+	vector<CvRect> vBBox;
+	vector<vector<CvPoint> > vCenter;
+
+	//load positive file list BBoxes an center location
+	loadTrainPosFilesub(posvFilenames, vBBox, vCenter);
+	// Load image names
+	vector<string> imvFilenames;
+	loadImFile(imvFilenames);
+
+	char buffer[200];
+	//heap for negative training patches for next phase
+	priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining> neg_bd_exp;
+	// Run detector for each image
+	for (unsigned int i = 0; i<imvFilenames.size(); ++i) {
+
+		// Load image
+		IplImage *img = 0;
+		img = cvLoadImage(imvFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
+		if (!img) {
+			cout << "Could not load image file: " << (impath + "/" + imvFilenames[i]).c_str() << endl;
+			exit(-1);
+		}
+
+		// Detection for all scales
+		crDetect.detectPyramidhard(img, scales,ratios,imvFilenames[i].c_str(), neg_bd_exp, posvFilenames[i].c_str(), vBBox, vCenter, MAX_NEG_PER_IMAGE);
+		// TODO - add mechnism to save the neg_bd_exp to a .txt file with the host identifier
+
+		// Store result
+		//string delimiter = ".";
+		//string s = vFilenames[i].c_str();
+		//string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+		//size_t found = token.find_last_of("/\\");
+		//string fname = token.substr(found + 1);//filename
+		//string path = token.substr(0, found); //full path of image without filename
+		//string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
+		//string curfolder = outpath + "\\" + pfolder; //store path for detection
+		//// Check if folder for result is exist and create if not
+		//if (!DirectoryExists(curfolder.c_str())){
+		//	string execstr1 = "mkdir ";
+		//	execstr1 += curfolder;
+		//	system(execstr1.c_str());
+		//}
+
+		// Release image
+		cvReleaseImage(&img);
+
+	}
+
+}
+
 // Extract patches from training data
 void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 		
@@ -748,17 +879,22 @@ void print_error_of_training(CRPatch& Train){
 	float rmse = 0;
 	float pos_conf = 0;
 	float neg_conf = 0;
-
+	ofstream myfile;
+	char mybuffer[400];
+	sprintf(mybuffer, "%s\\summary.txt", outpath);
+	myfile.open(mybuffer);
 	for (int i = 0; i < Train.vLPatches.size(); i++){
 		for (vector<PatchFeature>::const_iterator it = (Train.vLPatches[i]).begin(); it != (Train.vLPatches[i]).end(); ++it){
 			rmse += (*it).err;
 			if (i == 0) neg_conf += (*it).cmean;
 			else pos_conf += (*it).cmean;
 		}
-		if (i == 0)	cout << "Confidence in negative is: " << std::to_string(1-(neg_conf / (Train.vLPatches[i]).size())) << endl;
-		else cout << "Confidence in positive is: " << std::to_string(pos_conf / (Train.vLPatches[i]).size()) << endl;
+		if (i == 0)	myfile << "Confidence in negative is: " << std::to_string(1 - (neg_conf / (Train.vLPatches[i]).size())) << endl;
+		else myfile << "Confidence in positive is: " << std::to_string(pos_conf / (Train.vLPatches[i]).size()) << endl;
 	}
-	cout << "RMSE is: " << std::to_string(sqrt(rmse / ((Train.vLPatches[1]).size()))) << endl;
+	myfile << "RMSE is: " << std::to_string(sqrt(rmse / ((Train.vLPatches[1]).size()))) << endl;
+	myfile.close();
+
 }
 
 void run_cascade() {
@@ -910,6 +1046,25 @@ void run_post(int sigmaSup = 9) {
 
 }
 
+void run_detecthard() {
+	// Init forest with number of trees
+	CRForest crForest(ntrees);
+
+	// Load forest
+	crForest.loadForest(treepath.c_str());
+
+	// Init detector
+	CRForestDetector crDetect(&crForest, p_width, p_height);
+
+	// create directory for output (test statistics and intemidiate text files) -TODO
+	//string execstr = "mkdir ";
+	//execstr += outpath;
+	//system(execstr.c_str());
+
+	// run detector and save results
+	detect_hardneg(crDetect);
+}
+
 int main(int argc, char* argv[])
 {
 	int mode = 1;
@@ -955,7 +1110,7 @@ int main(int argc, char* argv[])
 		case 4:
 			//Running cascade learning where first batch (3rd) is trained on all trainig samples
 			//next is only on hard training (half trainset) samples and next on hardest (half of half)
-			run_cascade();
+			run_detecthard();
 			break;
 		
 
