@@ -108,10 +108,11 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 
 }
 
-void CRForestDetector::detectColorHardNeg(IplImage* img, priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining>& pos_bad_examples,
-	vector<float>& ratios, const char* imfile, const char* filename, vector<CvRect>& vBBox, vector<vector<CvPoint> >& vCenter, int max_neg_samples) {
+float CRForestDetector::detectColorHardNeg(IplImage* img, priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining>& pos_bad_examples,
+	vector<float>& ratios, const char* imfile, const char* filename, CvRect vBBox, CvPoint vCenter, int max_neg_samples) {
 	//imfile is the full path to the image *img
-
+	float se = 0; //Square error of the entire training image
+	uint numpatches = 0;//number of patches in image
 	// extract features
 	vector<IplImage*> vImg;
 	//CRPatch::extractFeatureChannels(img, vImg);
@@ -139,14 +140,13 @@ void CRForestDetector::detectColorHardNeg(IplImage* img, priority_queue<PatchHar
 		cx = xoffset;
 
 		for (x = 0; x < img->width - width; ++x, ++cx) {
-
+			numpatches++;
 
 			// regression for a single patch
 			vector<const LeafNode*> result;
 			crForest->regression(result, ptFCh_row, stepImg);
 			float cmean = 0; //"Class Mean": Probability of being foreground according to the leaf arrived to.
 			int numpt = 0; // number of points in a specific leaf
-
 			// vote for all trees (leafs) *itL is a leaf <itL>
 			for (vector<const LeafNode*>::const_iterator itL = result.begin(); itL != result.end(); ++itL) {
 
@@ -155,22 +155,48 @@ void CRForestDetector::detectColorHardNeg(IplImage* img, priority_queue<PatchHar
 				// 
 				//if((*itL)->pfg>0.5) {
 
-				// voting weight for leaf  (vCenter.Size is number of training patches got to this leaft)
+				// voting weight for each point in leaf  (vCenter.Size is number of training patches got to this leaft)
 				//							(result.size is the number of trees in the forest
-				cmean += (*itL)->pfg / float((*itL)->vCenter.size() * result.size());
+				cmean += (*itL)->pfg * (float((*itL)->vCenter.size()));
 				numpt += (*itL)->vCenter.size();
 				// vote for all points stored in the leaf ->  *it is a point <it> in the leaf 
 				// } // end if
+				// voting weight for each point in leaf 
+				float w = (*itL)->pfg / float((*itL)->vCenter.size() * result.size());
+
+				// vote for all points stored in the leaf
+				for (vector<vector<CvPoint> >::const_iterator it = (*itL)->vCenter.begin(); it != (*itL)->vCenter.end(); ++it) {
+
+					for (int c = 0; c<(int)ratios.size(); ++c) {
+						//int x = int(cx - (*it)[0].x * ratios[c] + 0.5);
+						//int y = cy - (*it)[0].y;
+						int dx = int(vCenter.x - (x+xoffset-(*it)[0].x) * ratios[c] + 0.5);
+						int dy = int(vCenter.y - (y+yoffset-(*it)[0].y) * ratios[c] + 0.5);
+						//cout << (dx <10 && -dx>-10) || (dy<5 && -dy > -5);
+						//cout << " dx is: " << dx << " dy is: " << dy << endl;
+						//cout << "Weighted Square error: " << w*(pow(dx, 2) + pow(dy, 2)) << endl;
+						se += w*(pow(dx, 2) + pow(dy, 2)); // aggregating the square error of this patch on all trees
+					}
+				}
 			}
 			cmean = cmean / float(numpt); //average class decision calculated as a weighted average between trees (with points arrived to each leaf as a bais)
 			//if heap is either full or current patch is worst than all other patches in the heap take out the lower push it in
-			if (!isinposrect(CvRect(vBBox[0].x, vBBox[0].y, vBBox[0].width, vBBox[0].height),CvPoint(x, y))){//TODO condition for patch to be negative - write a function to detect if a patch has more of it's 75% of it's area in the positive vbbox)			
+			if (!isinposrect(CvRect(vBBox.x, vBBox.y, vBBox.width, vBBox.height),CvPoint(x, y))){// condition for patch to be negative 100% contained in BB
 				if (pos_bad_examples.size() < max_neg_samples || pos_bad_examples.top().cmean<cmean){
-					if (pos_bad_examples.size() == max_neg_samples) pos_bad_examples.pop();
+					if (pos_bad_examples.size() == max_neg_samples) {
+						////sanaty check - remove
+						//while (!pos_bad_examples.empty()){
+						//	cout << "top of heap is: " << pos_bad_examples.top().cmean << endl;
+						//	pos_bad_examples.pop();
+						//}
+						cout << "(" << x << "," << y << ") ";
+						cout << "smallest in heap was (now popping): " << pos_bad_examples.top().cmean << endl;
+						pos_bad_examples.pop();
+					}
 					char buffer[100];
-					sprintf(buffer, "%s %i %i %i %i", filename, x, y, x + width-1, y + height-1);
-					PatchHardMining *neg_patch = new PatchHardMining();
-					neg_patch->patchpath = buffer;
+					sprintf(buffer, "%s %i %i %i %i", filename, x, y, x + width, y + height);
+					PatchHardMining* neg_patch = new PatchHardMining();
+					neg_patch->patchpath = string(buffer);
 					neg_patch->cmean = cmean;
 					pos_bad_examples.push(*neg_patch);
 				}
@@ -194,6 +220,7 @@ void CRForestDetector::detectColorHardNeg(IplImage* img, priority_queue<PatchHar
 
 	delete[] ptFCh;
 	delete[] ptFCh_row;
+	return se / numpatches;
 }
 
 void CRForestDetector::detectColorcascade(PatchFeature& p, priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& pos_bad_examples,
@@ -306,7 +333,8 @@ void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& 
 
 }
 
-void CRForestDetector::detectPyramidhard(IplImage *img, std::vector<float>& scales, std::vector<float>& ratios, const char *imfile, priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining>& neg_examples, const char *filename, vector<CvRect>& vBBox, vector<vector<CvPoint>>& vCenter, int max_neg_samples) {
+float CRForestDetector::detectPyramidhard(IplImage *img, std::vector<float>& scales, std::vector<float>& ratios, const char *imfile, priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining>& neg_examples, const char *filename, CvRect vBBox, CvPoint vCenter, int max_neg_samples) {
+	float mse = 0;
 	if (img->nChannels == 1) {
 
 		std::cerr << "gray color images are not supported." << std::endl;
@@ -323,7 +351,7 @@ void CRForestDetector::detectPyramidhard(IplImage *img, std::vector<float>& scal
 			cvResize(img, cLevel, CV_INTER_LINEAR);
 
 			// detection
-			detectColorHardNeg(img, neg_examples, ratios, imfile, filename, vBBox, vCenter, max_neg_samples);
+			mse = detectColorHardNeg(img, neg_examples, ratios, imfile, filename, vBBox, vCenter, max_neg_samples); // TODO - if multi scale need to change this func
 
 			cvReleaseImage(&cLevel);
 		}
@@ -331,6 +359,7 @@ void CRForestDetector::detectPyramidhard(IplImage *img, std::vector<float>& scal
 		cout << "Time " << (double)(clock() - tstart) / CLOCKS_PER_SEC << " sec" << endl;
 
 	}
+	return mse;
 }
 
 void CRForestDetector::detectPyramidcascade(PatchFeature& p, priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& pos_bad_examples,priority_queue<PatchFeature, vector<PatchFeature>, LessThanFeature>& neg_bad_examples, int k, std::vector<float>& ratios) {

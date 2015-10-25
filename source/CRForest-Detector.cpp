@@ -62,6 +62,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <map>
 #include <string>
 #include <limits>
 #include <Windows.h>
@@ -102,7 +103,7 @@ int out_scale;
 string trainpospath;
 // File with postive examples
 string trainposfiles;
-// File with postive regions for hard negative mining
+// File with postive regions for hard negative mining for each host it is different
 string trainposfilessub;
 // number of maximum hard negative per frame
 int MAX_NEG_PER_IMAGE;
@@ -128,6 +129,21 @@ BOOL DirectoryExists(LPCTSTR szPath)
 
 	return (dwAttrib != INVALID_FILE_ATTRIBUTES &&
 		(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+}
+
+void getFilesList(string filePath, string extension, vector<string> & returnFileName)
+{
+	WIN32_FIND_DATA fileInfo;
+	HANDLE hFind;
+	string  fullPath = filePath + "\\" + extension;
+	hFind = FindFirstFile(fullPath.c_str(), &fileInfo);
+	if (hFind == INVALID_HANDLE_VALUE){ return; }
+	else {
+		returnFileName.push_back(filePath + "\\" + fileInfo.cFileName);
+		while (FindNextFile(hFind, &fileInfo) != 0){
+			return returnFileName.push_back(filePath + fileInfo.cFileName);
+		}
+	}
 }
 
 // load config file for dataset
@@ -229,6 +245,10 @@ void loadConfig(const char* filename, int mode) {
 		in.getline(buffer, 400);
 		in >> MAX_NEG_PER_IMAGE;
 		//in.getline(buffer,400);
+		//// TODO!
+		//in.getline(buffer, 400);
+		//in >> MAX_NEG_PER_IMAGE;
+		////in.getline(buffer,400);
 
 	} else {
 		cerr << "File not found " << filename << endl;
@@ -236,55 +256,79 @@ void loadConfig(const char* filename, int mode) {
 	}
 	in.close();
 
-	switch ( mode ) { // 0 - Training,1 - Show, 2 - Detect, 3 - Post Processing, 4 - Hard negative/Cascade
-		case 0:
-		cout << endl << "------------------------------------" << endl << endl;
-		cout << "Training:         " << endl;
-		cout << "Patches:          " << p_width << " " << p_height << endl;
-		cout << "Train pos:        " << trainpospath << endl;
-		cout << "                  " << trainposfiles << endl;
-		cout << "                  " << subsamples_pos << " " << samples_pos << endl;
-		cout << "Train neg:        " << trainnegpath << endl;
-		cout << "                  " << trainnegfiles << endl;
-		cout << "                  " << subsamples_neg << " " << samples_neg << endl;
-		cout << "Trees:            " << ntrees << " " << off_tree << " " << treepath << endl;
-		cout << endl << "------------------------------------" << endl << endl;
-		break;
+	switch (mode) { // 0 - Training,1 - Show, 2 - Detect, 3 - Post Processing, 4 - Hard negative/Cascade
+	case 0:{
+				cout << endl << "------------------------------------" << endl << endl;
+				cout << "Training:         " << endl;
+				cout << "Patches:          " << p_width << " " << p_height << endl;
+				cout << "Train pos:        " << trainpospath << endl;
+				cout << "                  " << trainposfiles << endl;
+				cout << "                  " << subsamples_pos << " " << samples_pos << endl;
+				cout << "Train neg:        " << trainnegpath << endl;
+				cout << "                  " << trainnegfiles << endl;
+				cout << "                  " << subsamples_neg << " " << samples_neg << endl;
+				cout << "Trees:            " << ntrees << " " << off_tree << " " << treepath << endl;
+				cout << endl << "------------------------------------" << endl << endl;
+				break;
+		}
+		case 1:{
+				   cout << endl << "------------------------------------" << endl << endl;
+				   cout << "Show:             " << endl;
+				   cout << "Trees:            " << ntrees << " " << treepath << endl;
+				   cout << endl << "------------------------------------" << endl << endl;
+				   break;
+		}
 
-		case 1:
-		cout << endl << "------------------------------------" << endl << endl;
-		cout << "Show:             " << endl;
-		cout << "Trees:            " << ntrees << " " << treepath << endl;
-		cout << endl << "------------------------------------" << endl << endl;
-		break;
-
-		case 4: // TODO - need to choose file to write to , and orginize the data
-		cout << endl << "------------------------------------" << endl << endl;
-		cout << "Detection:        " << endl;
-		cout << "Trees:            " << ntrees << " " << treepath << endl;
-		cout << "Patches:          " << p_width << " " << p_height << endl;
-		cout << "Images:           " << impath << endl;
-		cout << "                  " << imfiles << endl;
-		cout << "Scales:           "; for (unsigned int i = 0; i<scales.size(); ++i) cout << scales[i] << " "; cout << endl;
-		cout << "Ratios:           "; for (unsigned int i = 0; i<ratios.size(); ++i) cout << ratios[i] << " "; cout << endl;
-		cout << "Extract Features: " << xtrFeature << endl;
-		cout << "Output:           " << out_scale << " " << outpath << endl;
-		cout << endl << "------------------------------------" << endl << endl;
-		break;
-
-		default:
-		cout << endl << "------------------------------------" << endl << endl;
-		cout << "Detection:        " << endl;
-		cout << "Trees:            " << ntrees << " " << treepath << endl;
-		cout << "Patches:          " << p_width << " " << p_height << endl;
-		cout << "Images:           " << impath << endl;
-		cout << "                  " << imfiles << endl;
-		cout << "Scales:           "; for(unsigned int i=0;i<scales.size();++i) cout << scales[i] << " "; cout << endl;
-		cout << "Ratios:           "; for(unsigned int i=0;i<ratios.size();++i) cout << ratios[i] << " "; cout << endl;
-		cout << "Extract Features: " << xtrFeature << endl;
-		cout << "Output:           " << out_scale << " " << outpath << endl;
-		cout << endl << "------------------------------------" << endl << endl;
-		break;
+		case 4:{ //hard negative mining
+				   // getting host name
+				   string delimiter = ".";
+				   string s = imfiles.c_str();
+				   string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+				   size_t found = token.find_last_of("/\\");
+				   string fname = token.substr(found + 1);//filename
+				   string del = "_";
+				   string host = fname.substr(0, fname.find(del));
+				   time_t  timev;
+				   struct tm * timeinfo;
+				   time(&timev);
+				   timeinfo = localtime(&timev);
+				   char buffer[80];
+				   strftime(buffer, 80, "%Y_%m_%d_%H_%M_%S", timeinfo);
+				   string expdocfn = outpath + "\\" + buffer + "_doc_" + host + ".txt";
+				   ofstream expdoc;
+				   expdoc.open(expdocfn);
+				   if (!expdoc.is_open()){
+					   cout << "fail to open file" << endl;
+					   return;
+				   }
+				   expdoc << endl << "------------------------------------" << endl;
+				   expdoc << "Hard Negative Mining:        " << endl;
+				   expdoc << "Trees:				  " << ntrees << " " << treepath << endl;
+				   expdoc << "Patches:				  " << p_width << " " << p_height << endl;
+				   expdoc << "Images path:			  " << impath << endl;
+				   expdoc << "Images file		      " << imfiles << endl;
+				   expdoc << "Scales:                 "; for (unsigned int i = 0; i < scales.size(); ++i) expdoc << scales[i] << " "; expdoc << endl;
+				   expdoc << "Ratios:                 "; for (unsigned int i = 0; i < ratios.size(); ++i) expdoc << ratios[i] << " "; expdoc << endl;
+				   expdoc << "Extract Features:       " << xtrFeature << endl;
+				   expdoc << "Output:				  " << out_scale << " " << outpath << endl;
+				   expdoc << "Max Neg Samples per fr: " << MAX_NEG_PER_IMAGE << endl;
+				   expdoc << endl << "------------------------------------" << endl;
+				   break;
+		}
+		default:{
+					cout << endl << "------------------------------------" << endl << endl;
+					cout << "Detection:        " << endl;
+					cout << "Trees:            " << ntrees << " " << treepath << endl;
+					cout << "Patches:          " << p_width << " " << p_height << endl;
+					cout << "Images:           " << impath << endl;
+					cout << "                  " << imfiles << endl;
+					cout << "Scales:           "; for (unsigned int i = 0; i < scales.size(); ++i) cout << scales[i] << " "; cout << endl;
+					cout << "Ratios:           "; for (unsigned int i = 0; i < ratios.size(); ++i) cout << ratios[i] << " "; cout << endl;
+					cout << "Extract Features: " << xtrFeature << endl;
+					cout << "Output:           " << out_scale << " " << outpath << endl;
+					cout << endl << "------------------------------------" << endl << endl;
+					break;
+		}
 	}
 
 }
@@ -362,7 +406,7 @@ void loadTrainPosFile(std::vector<string>& vFilenames, std::vector<CvRect>& vBBo
 	}
 }
 
-// load positive training image filenames
+// load  training image filenames (for hard negative mining)
 void loadTrainPosFilesub(std::vector<string>& vFilenames, std::vector<CvRect>& vBBox, std::vector<std::vector<CvPoint> >& vCenter) {
 
 	unsigned int size, numop;
@@ -578,19 +622,27 @@ void detect_hardneg(CRForestDetector& crDetect) {
 	vector<string> posvFilenames;
 	vector<CvRect> vBBox;
 	vector<vector<CvPoint> > vCenter;
-
+	fstream fileres;
+	// Get the hostname (stores in the configuration file)
+	string delimiter = ".";
+	string s =imfiles.c_str();
+	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+	size_t found = token.find_last_of("/\\");
+	string fname = token.substr(found + 1);//filename
+	string del = "_";
+	string host = fname.substr(0,fname.find(del)); 
+	string something = outpath + "\\train_hard_neg_" + host + "tmp.txt";
+	fileres.open(something,std::ios_base::app); 
 	//load positive file list BBoxes an center location
 	loadTrainPosFilesub(posvFilenames, vBBox, vCenter);
 	// Load image names
-	vector<string> imvFilenames;
-	loadImFile(imvFilenames);
+	vector<string> imvFilenames = posvFilenames; // Yonatan - for hard mining
+	float mmse = 0;
 
-	char buffer[200];
-	//heap for negative training patches for next phase
-	priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining> neg_bd_exp;
 	// Run detector for each image
 	for (unsigned int i = 0; i<imvFilenames.size(); ++i) {
-
+		//heap for negative training patches for next phase
+		priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining> neg_bd_exp;
 		// Load image
 		IplImage *img = 0;
 		img = cvLoadImage(imvFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
@@ -600,30 +652,46 @@ void detect_hardneg(CRForestDetector& crDetect) {
 		}
 
 		// Detection for all scales
-		crDetect.detectPyramidhard(img, scales,ratios,imvFilenames[i].c_str(), neg_bd_exp, posvFilenames[i].c_str(), vBBox, vCenter, MAX_NEG_PER_IMAGE);
-		// TODO - add mechnism to save the neg_bd_exp to a .txt file with the host identifier
-
-		// Store result
-		//string delimiter = ".";
-		//string s = vFilenames[i].c_str();
-		//string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
-		//size_t found = token.find_last_of("/\\");
-		//string fname = token.substr(found + 1);//filename
-		//string path = token.substr(0, found); //full path of image without filename
-		//string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
-		//string curfolder = outpath + "\\" + pfolder; //store path for detection
-		//// Check if folder for result is exist and create if not
-		//if (!DirectoryExists(curfolder.c_str())){
-		//	string execstr1 = "mkdir ";
-		//	execstr1 += curfolder;
-		//	system(execstr1.c_str());
-		//}
-
+		mmse = crDetect.detectPyramidhard(img, scales, ratios, imvFilenames[i].c_str(), neg_bd_exp, posvFilenames[i].c_str(), vBBox[i], vCenter[i][0], MAX_NEG_PER_IMAGE);
+		while (!neg_bd_exp.empty()){
+			fileres << neg_bd_exp.top().patchpath << endl;
+			neg_bd_exp.pop();
+		}
 		// Release image
 		cvReleaseImage(&img);
+		// Release Heap
+		neg_bd_exp = priority_queue<PatchHardMining, vector<PatchHardMining>, LessThanPatchHardMining>();
 
 	}
-
+	fileres.close();
+	//detect & merge duplicates in the .txt file and update the num of entrances.
+	fileres.open(something, ios::in);
+	fstream outfile;
+	string fnamefin = outpath + "\\train_hard_neg_new" + host + ".txt";
+	outfile.open(fnamefin, ios::out);
+	map<string, int> mymap;
+	string cur;
+	while (getline(fileres, cur)){
+		if (mymap[cur] == NULL){
+			mymap[cur] = 1;
+			outfile.write(cur.c_str(), cur.length());
+			outfile.put('\n');
+		}
+		else
+			mymap[cur]++;
+	}
+	outfile.close();
+	fileres.close();
+	// don't want to remove it so will reduce to one exmple per line
+	//if (remove(something.c_str()) != 0)
+	//	perror("Error deleting file");
+	//else
+	//	puts("File successfully deleted");
+	vector<string> fndoc;
+	getFilesList(outpath, ("*_doc_" + host + "*"), fndoc);
+	outfile.open(fndoc.back(), ios::out | ios::app);
+	outfile << "MRMMSE: " << sqrt(mmse / imvFilenames.size()) << endl;
+	outfile.close();
 }
 
 // Extract patches from training data
@@ -824,7 +892,7 @@ double medianMat(Mat Input, int nVals){
 // Init and start detector
 void run_detect() {
 	// Init forest with number of trees
-	CRForest crForest( ntrees ); ////TODO for distributed system (detecting)
+	CRForest crForest( ntrees );
 
 	// Load forest
 	crForest.loadForest(treepath.c_str());	
@@ -1055,38 +1123,113 @@ void run_detecthard() {
 
 	// Init detector
 	CRForestDetector crDetect(&crForest, p_width, p_height);
-
-	// create directory for output (test statistics and intemidiate text files) -TODO
-	//string execstr = "mkdir ";
-	//execstr += outpath;
-	//system(execstr.c_str());
+	
+	if (!DirectoryExists(outpath.c_str())){
+		string execstr1 = "mkdir ";
+		execstr1 += outpath;
+		system(execstr1.c_str());
+	}
 
 	// run detector and save results
 	detect_hardneg(crDetect);
 }
 
+void concatenate_text(string inputFolderPath){
+	// find all the new_hard_neg files
+	string extension = "*newCGM*.txt";
+	vector<string> returnFileName;
+	getFilesList(inputFolderPath, extension, returnFileName);
+	vector<string>::const_iterator it = returnFileName.begin();
+	fstream fin;
+	fstream fout;
+	u_int ctr = 0;
+	string cur;
+	string ftmp = inputFolderPath + "\\train_negtmp.txt";
+	string ffinal = trainnegfiles;
+	string ffinaldup = inputFolderPath + "\\train_negdup.txt";
+	string neg_orig = inputFolderPath + "\\train_negcopy.txt";
+	fout.open(ftmp,ios_base::out);
+	
+	// writing all the data from copy (original neg) to tmp and increase counter
+	fin.open(neg_orig, ios_base::in);
+	// two dummy lines
+	getline(fin, cur);
+	getline(fin, cur);
+	while (getline(fin, cur)){
+		fout << cur << endl;
+		ctr++;
+	}
+	fin.close();
+	// writing all the new_hard_neg into \\train_negtmp.txt
+	while (it != returnFileName.end())
+	{
+		fin.open(*it, ios_base::in);//read file names
+		while (getline(fin, cur)){
+			fout << cur << endl;
+			ctr++;
+		}
+		fin.close();
+		it++;
+	}
+fin.close();
+fout.close();
+fin.open(ftmp, ios_base::in);
+fout.open(ffinaldup, ios_base::out);
+fout << ctr << " 1" << endl << endl;
+fout << fin.rdbuf();
+fout.close();
+fin.close();
+// remove duplicates
+fin.open(ffinaldup, ios_base::in);
+fout.open(ffinal, ios_base::out);
+map<string, int> mymap;
+while (getline(fin, cur)){
+	if (mymap[cur] == NULL){
+		mymap[cur] = 1;
+		fout.write(cur.c_str(), cur.length());
+		fout.put('\n');
+	}
+	else
+		mymap[cur]++;
+}
+fin.close();
+fout.close();
+//remove the tmp file
+if (remove(ftmp.c_str()) != 0)
+	perror("Error deleting Temp file");
+else
+	puts("Temp File successfully deleted");
+if (remove(ffinaldup.c_str()) != 0)
+perror("Error deleting duplicate file");
+else
+puts("Duplicate File successfully deleted");
+
+}
+
 int main(int argc, char* argv[])
 {
 	int mode = 1;
-
+	string hardneg_dir;
 	// Check argument
 	if(argc<2) {
 		cout << "Usage: CRForest-Detector.exe mode [config.txt] [tree_offset]" << endl;
 		cout << "mode: 0 - train; 1 - show; 2 - detect; 3 - post; 4 - cascade " << endl;
 		cout << "tree_offset: output number for trees" << endl;
 		cout << "Load default: mode - 2" << endl; 
-	} else
+	}
+	 else if (argc > 2)
 		mode = atoi(argv[1]);
-	
-	off_tree = 0;	
+	 else { // option for hardneg concatnation argc==2
+		 hardneg_dir= argv[1];
+		 mode = 9; // dummy option
+	 }
+	off_tree = 0;
 	if(argc>3)
 		off_tree = atoi(argv[3]);
 
 	// load configuration for dataset
 	if(argc>2)
 		loadConfig(argv[2], mode);
-	else
-		loadConfig("config.txt", mode);
 	int tstart_train = clock();
 	switch ( mode ) { 
 		case 0: 	
@@ -1110,9 +1253,14 @@ int main(int argc, char* argv[])
 		case 4:
 			//Running cascade learning where first batch (3rd) is trained on all trainig samples
 			//next is only on hard training (half trainset) samples and next on hardest (half of half)
+			ntrees = off_tree;
 			run_detecthard();
 			break;
 		
+		case 9:
+			concatenate_text(hardneg_dir.c_str());
+			cout << "Finished concatenate the files " << endl;
+			break;
 
 		default:
 

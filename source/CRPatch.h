@@ -50,7 +50,7 @@ struct LessThanFeature {
 // structure for image patch for negative mining
 struct PatchHardMining {
 	PatchHardMining() {}
-	char* patchpath;
+	std::string patchpath;
 	double cmean;
 };
 
