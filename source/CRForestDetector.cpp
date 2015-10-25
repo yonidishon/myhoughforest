@@ -189,8 +189,8 @@ float CRForestDetector::detectColorHardNeg(IplImage* img, priority_queue<PatchHa
 						//	cout << "top of heap is: " << pos_bad_examples.top().cmean << endl;
 						//	pos_bad_examples.pop();
 						//}
-						cout << "(" << x << "," << y << ") ";
-						cout << "smallest in heap was (now popping): " << pos_bad_examples.top().cmean << endl;
+						//cout << "(" << x << "," << y << ") ";
+						//cout << "smallest in heap was (now popping): " << pos_bad_examples.top().cmean << endl;
 						pos_bad_examples.pop();
 					}
 					char buffer[100];
@@ -351,7 +351,7 @@ float CRForestDetector::detectPyramidhard(IplImage *img, std::vector<float>& sca
 			cvResize(img, cLevel, CV_INTER_LINEAR);
 
 			// detection
-			mse = detectColorHardNeg(img, neg_examples, ratios, imfile, filename, vBBox, vCenter, max_neg_samples); // TODO - if multi scale need to change this func
+			mse += detectColorHardNeg(img, neg_examples, ratios, imfile, filename, vBBox, vCenter, max_neg_samples); // TODO - if multi scale need to change this func
 
 			cvReleaseImage(&cLevel);
 		}

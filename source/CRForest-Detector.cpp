@@ -652,7 +652,7 @@ void detect_hardneg(CRForestDetector& crDetect) {
 		}
 
 		// Detection for all scales
-		mmse = crDetect.detectPyramidhard(img, scales, ratios, imvFilenames[i].c_str(), neg_bd_exp, posvFilenames[i].c_str(), vBBox[i], vCenter[i][0], MAX_NEG_PER_IMAGE);
+		mmse += crDetect.detectPyramidhard(img, scales, ratios, imvFilenames[i].c_str(), neg_bd_exp, posvFilenames[i].c_str(), vBBox[i], vCenter[i][0], MAX_NEG_PER_IMAGE);
 		while (!neg_bd_exp.empty()){
 			fileres << neg_bd_exp.top().patchpath << endl;
 			neg_bd_exp.pop();
