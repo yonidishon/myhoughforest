@@ -664,7 +664,9 @@ void detect_hardneg(CRForestDetector& crDetect) {
 
 	}
 	fileres.close();
-	//detect & merge duplicates in the .txt file and update the num of entrances.
+
+	//detect & merge duplicates in the <>tmp.txt file  in train_hard_neg_new<host>.txt
+	//no need to update the num of entrances cause this will be handled by the last host concatenating the files
 	fileres.open(something, ios::in);
 	fstream outfile;
 	string fnamefin = outpath + "\\train_hard_neg_new" + host + ".txt";
@@ -1152,57 +1154,62 @@ void concatenate_text(string inputFolderPath){
 	
 	// writing all the data from copy (original neg) to tmp and increase counter
 	fin.open(neg_orig, ios_base::in);
-	// two dummy lines
+	// dumping the first two lines of original
 	getline(fin, cur);
 	getline(fin, cur);
+	//writing all lines already in train_neg<>.txt to train_negtmp.txt
 	while (getline(fin, cur)){
 		fout << cur << endl;
-		ctr++;
+		//ctr++;
 	}
 	fin.close();
+
 	// writing all the new_hard_neg into \\train_negtmp.txt
 	while (it != returnFileName.end())
 	{
 		fin.open(*it, ios_base::in);//read file names
 		while (getline(fin, cur)){
 			fout << cur << endl;
-			ctr++;
+			//ctr++;
 		}
 		fin.close();
 		it++;
 	}
-fin.close();
-fout.close();
-fin.open(ftmp, ios_base::in);
-fout.open(ffinaldup, ios_base::out);
-fout << ctr << " 1" << endl << endl;
-fout << fin.rdbuf();
-fout.close();
-fin.close();
-// remove duplicates
-fin.open(ffinaldup, ios_base::in);
-fout.open(ffinal, ios_base::out);
-map<string, int> mymap;
-while (getline(fin, cur)){
-	if (mymap[cur] == NULL){
-		mymap[cur] = 1;
-		fout.write(cur.c_str(), cur.length());
-		fout.put('\n');
+	fout.close();
+
+	// remove duplicates
+	fin.open(ftmp, ios_base::in);
+	fout.open(ffinaldup, ios_base::out);
+	map<string, int> mymap;
+	while (getline(fin, cur)){
+		if (mymap[cur] == NULL){
+			mymap[cur] = 1;
+			fout.write(cur.c_str(), cur.length());
+			fout.put('\n');
+			ctr++;
+		}
+		else
+			mymap[cur]++;
 	}
+	fin.close();
+	fout.close();
+
+	//put the number of lines in the head of the file and write everything to final
+	fin.open(ffinaldup, ios_base::in);
+	fout.open(ffinal, ios_base::out);
+	fout << ctr << " 1" << endl << endl;
+	fout << fin.rdbuf();
+	fin.close();
+	fout.close();
+	//remove the tmp file
+	if (remove(ftmp.c_str()) != 0)
+		perror("Error deleting Temp file");
 	else
-		mymap[cur]++;
-}
-fin.close();
-fout.close();
-//remove the tmp file
-if (remove(ftmp.c_str()) != 0)
-	perror("Error deleting Temp file");
-else
-	puts("Temp File successfully deleted");
-if (remove(ffinaldup.c_str()) != 0)
-perror("Error deleting duplicate file");
-else
-puts("Duplicate File successfully deleted");
+		puts("Temp File successfully deleted");
+	if (remove(ffinaldup.c_str()) != 0)
+	perror("Error deleting duplicate file");
+	else
+	puts("Duplicate File successfully deleted");
 
 }
 
