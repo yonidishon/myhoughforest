@@ -141,7 +141,7 @@ void getFilesList(string filePath, string extension, vector<string> & returnFile
 	else {
 		returnFileName.push_back(filePath + "\\" + fileInfo.cFileName);
 		while (FindNextFile(hFind, &fileInfo) != 0){
-			return returnFileName.push_back(filePath + fileInfo.cFileName);
+			returnFileName.push_back(filePath + "\\" + fileInfo.cFileName);
 		}
 	}
 }
@@ -692,7 +692,7 @@ void detect_hardneg(CRForestDetector& crDetect) {
 	vector<string> fndoc;
 	getFilesList(outpath, ("*_doc_" + host + "*"), fndoc);
 	outfile.open(fndoc.back(), ios::out | ios::app);
-	outfile << "MRMMSE: " << sqrt(mmse / imvFilenames.size()) << endl;
+	outfile << "RMMSE: " << sqrt(mmse / imvFilenames.size()) << endl;
 	outfile.close();
 }
 
@@ -1147,7 +1147,9 @@ void concatenate_text(string inputFolderPath){
 	u_int ctr = 0;
 	string cur;
 	string ftmp = inputFolderPath + "\\train_negtmp.txt";
-	string ffinal = trainnegfiles;
+	vector<string> orignegfile;
+	getFilesList(inputFolderPath, "train_neg_*.txt", orignegfile);
+	string ffinal = orignegfile.front();
 	string ffinaldup = inputFolderPath + "\\train_negdup.txt";
 	string neg_orig = inputFolderPath + "\\train_negcopy.txt";
 	fout.open(ftmp,ios_base::out);
