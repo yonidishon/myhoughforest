@@ -1199,7 +1199,7 @@ void concatenate_text(string inputFolderPath){
 	//put the number of lines in the head of the file and write everything to final
 	fin.open(ffinaldup, ios_base::in);
 	fout.open(ffinal, ios_base::out);
-	fout << ctr << " 1" << endl << endl;
+	fout << ctr-1 << " 1" << endl << endl;
 	fout << fin.rdbuf();
 	fin.close();
 	fout.close();
