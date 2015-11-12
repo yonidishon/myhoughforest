@@ -271,7 +271,7 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 			}
 		}
 		int d = vmax-vmin;
-
+		// if it is possible to find a Thershold - find best one
 		if(d>0) {
 
 			// Find best threshold
@@ -295,7 +295,7 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 						found = true;
 						bestDist = tmpDist;
 						for(int t=0; t<5;++t) test[t] = tmpTest[t];
-						test[5] = tr;
+						test[5] = tr; //saving the best thershold to the test *int Arrray
 						SetA = tmpA;
 						SetB = tmpB;
 					}

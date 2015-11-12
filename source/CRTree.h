@@ -140,8 +140,9 @@ inline const LeafNode* CRTree::regression(uchar** ptFCh, int stepImg) const {
 	// return leaf
 	return &leaf[pnode[0]];
 }
-
+// randomally select two pixels in the patch and the channel
 inline void CRTree::generateTest(int* test, unsigned int max_w, unsigned int max_h, unsigned int max_c) {
+	//return value is int array of zize[5] [p1(x,y),p2(x,y),channel]
 	test[0] = cvRandInt( cvRNG ) % max_w;
 	test[1] = cvRandInt( cvRNG ) % max_h;
 	test[2] = cvRandInt( cvRNG ) % max_w;

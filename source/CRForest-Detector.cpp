@@ -496,7 +496,7 @@ void loadTrainNegFile(std::vector<string>& vFilenames, std::vector<CvRect>& vBBo
 
 		in.close();
 	} else {
-		cerr << "File not found " << trainposfiles.c_str() << endl;
+		cerr << "File not found " << trainnegfiles.c_str() << endl;
 		exit(-1);
 	}
 }
