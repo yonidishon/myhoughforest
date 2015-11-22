@@ -23,8 +23,8 @@ CRTree::CRTree(const char* filename) {
 		// allocate memory for tree table
 		in >> max_depth;
 		num_nodes = (int)pow(2.0,int(max_depth+1))-1;
-		// num_nodes x 7 matrix as vector
-		treetable = new int[num_nodes * 7];
+		// num_nodes x NUMCOL matrix as vector ([leafindex,x1,y1,x2,y2,chan,th]-leafindex (if not leaf == -1),x1,y1,x2,y2 (coordinates for test to perform),channel,thres (chosen in random))
+		treetable = new int[num_nodes * NUMCOL];
 		int* ptT = &treetable[0];
 		
 		// allocate memory for leafs
@@ -37,7 +37,7 @@ CRTree::CRTree(const char* filename) {
 		// read tree nodes
 		for(unsigned int n=0; n<num_nodes; ++n) {
 			in >> dummy; in >> dummy;
-			for(unsigned int i=0; i<7; ++i, ++ptT) {
+			for (unsigned int i = 0; i<NUMCOL; ++i, ++ptT) {
 				in >> *ptT;
 			}
 		}
@@ -93,7 +93,7 @@ bool CRTree::saveTree(const char* filename) const {
 			}
 
 			out << n << " " << depth << " ";
-			for(unsigned int i=0; i<7; ++i, ++ptT) {
+			for (unsigned int i = 0; i<NUMCOL; ++i, ++ptT) {
 				out << *ptT << " ";
 			}
 			out << endl;
@@ -150,7 +150,7 @@ void CRTree::grow(const vector<vector<const PatchFeature*> >& TrainSet, int node
 
 		vector<vector<const PatchFeature*> > SetA;
 		vector<vector<const PatchFeature*> > SetB;
-		int test[6];
+		int* test = new int[NUMCOL - 1];
 
 		// Set measure mode for split: 0 - classification, 1 - regression
 		unsigned int measure_mode = 1;
@@ -161,11 +161,11 @@ void CRTree::grow(const vector<vector<const PatchFeature*> >& TrainSet, int node
 	
 		// Find optimal test
 		if( optimizeTest(SetA, SetB, TrainSet, test, samples, measure_mode) ) {
-	
+			// cout << "Channel is:" << test[4] << "; Test Mode (1 - ave 0 - pixel):" << test[NUMCOL - 2] << endl;
 			// Store binary test for current node
-			int* ptT = &treetable[node*7];
+			int* ptT = &treetable[node*NUMCOL];
 			ptT[0] = -1; ++ptT; 
-			for(int t=0; t<6; ++t)
+			for (int t = 0; t<NUMCOL-1; ++t)
 				ptT[t] = test[t];
 
 			double countA = 0;
@@ -217,7 +217,7 @@ void CRTree::grow(const vector<vector<const PatchFeature*> >& TrainSet, int node
 // Create leaf node from patches 
 void CRTree::makeLeaf(const std::vector<std::vector<const PatchFeature*> >& TrainSet, float pnratio, int node) {
 	// Get pointer
-	treetable[node*7] = num_leaf;
+	treetable[node*NUMCOL] = num_leaf;
 	LeafNode* ptL = &leaf[num_leaf];
 
 	// Store data
@@ -244,7 +244,7 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 	double tmpDist;
 	// maximize!!!!
 	double bestDist = -DBL_MAX; 
-	int tmpTest[6];
+	int* tmpTest=new int[NUMCOL-1];
 
 	// Find best test of ITER iterations
 	for(unsigned int i =0; i<iter; ++i) {
@@ -256,11 +256,14 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 		}
 
 		// generate binary test without threshold
-		generateTest(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, TrainSet[1][0]->vPatch.size());
-
+		if (i < TrainSet[1][0]->vPatch.size()){ //first we choose test of patch mean for all channels
+			generateTestAve(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, i);
+		}
+		else{ 
+			generateTest(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, TrainSet[1][0]->vPatch.size());
+		};
 		// compute value for each patch
 		evaluateTest(valSet, &tmpTest[0], TrainSet);
-
 		// find min/max values for threshold
 		int vmin = INT_MAX;
 		int vmax = INT_MIN;
@@ -294,8 +297,10 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 
 						found = true;
 						bestDist = tmpDist;
+						// saving [x1,y1,x2,y2,chan]
 						for(int t=0; t<5;++t) test[t] = tmpTest[t];
 						test[5] = tr; //saving the best thershold to the test *int Arrray
+						test[NUMCOL - 2] = tmpTest[NUMCOL - 2];
 						SetA = tmpA;
 						SetB = tmpB;
 					}
@@ -320,12 +325,28 @@ void CRTree::evaluateTest(std::vector<std::vector<IntIndex> >& valSet, const int
 
 			// pointer to channel
 			CvMat* ptC = TrainSet[l][i]->vPatch[test[4]];
-			// get pixel values 
-			int p1 = (int)*(uchar*)cvPtr2D( ptC, test[1], test[0]);
-			int p2 = (int)*(uchar*)cvPtr2D( ptC, test[3], test[2]);
-		
-			valSet[l][i].val = p1 - p2;
-			valSet[l][i].index = i;			
+			switch (test[NUMCOL - 2]){ // last column has the type of test currently only pixel based and average of patch
+			case 1: {//patch mean
+						int patchSum = 0;
+						int numel = 0;
+						for (int y = test[1]; y < test[3] + 1; y++){
+							for (int x = test[0]; x < test[2] + 1; x++){
+								patchSum += (int)*(uchar*)cvPtr2D(ptC, y, x);
+								numel++;
+							}
+						}
+						valSet[l][i].val = patchSum /(double) numel;
+						break;
+			}
+			default: { // pixel test
+						 // get pixel values 
+						 int p1 = (int)*(uchar*)cvPtr2D(ptC, test[1], test[0]);
+						 int p2 = (int)*(uchar*)cvPtr2D(ptC, test[3], test[2]);
+						 valSet[l][i].val = p1 - p2;
+						 break;
+			}
+			}
+			valSet[l][i].index = i;
 		}
 		sort( valSet[l].begin(), valSet[l].end() );
 	}
