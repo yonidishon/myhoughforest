@@ -69,7 +69,7 @@ public:
 	// Extract patches from image
 	void extractPatches_orig(IplImage *img, unsigned int n, int label, CvRect* box = 0, std::vector<CvPoint>* vCenter = 0);
 	void extractPatches(IplImage *img, const char* fullpath, unsigned int n, int label, CvRect* box = 0, std::vector<CvPoint>* vCenter = 0);
-
+	void extractPatchesMul(IplImage *img, const char* fullpath, unsigned int n, int label, std::vector<CvRect>& box, int startpos,int endpos);
 	// Extract features from image
 	static void extractFeatureChannels(IplImage *img, std::vector<IplImage*>& vImg);
 	// Extract features from image ( Only HOG like features - and adding my PCAs and PCAm)

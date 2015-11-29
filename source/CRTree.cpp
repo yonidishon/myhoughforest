@@ -277,7 +277,7 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 		// if it is possible to find a Thershold - find best one
 		if(d>0) {
 
-			// Find best threshold
+			// Find best threshold - 10 tries!
 			for(unsigned int j=0; j<10; ++j) { 
 
 				// Generate some random thresholds

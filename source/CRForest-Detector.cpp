@@ -738,32 +738,49 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 	loadTrainNegFile(vFilenames,  vBBox);
 
 	// load negative images and extract patches
-	for(int i=0; i<(int)vFilenames.size(); ++i) {
-
-		if(i%50==0) cout << i << " " << flush;
-
-		if(subsamples_neg <= 0 || (int)vFilenames.size()<=subsamples_neg || ( cvRandReal(pRNG)*double(vFilenames.size()) < double(subsamples_neg) ) ) {
+	int i = 0;
+	while (i < (int)vFilenames.size()){
+	//for(int i=0; i<(int)vFilenames.size(); ++i) {
+		if (i % 50 == 0) cout << i << " " << flush;
+		if (subsamples_neg <= 0 || (int)vFilenames.size() <= subsamples_neg || (cvRandReal(pRNG)*double(vFilenames.size()) < double(subsamples_neg))) {
 
 			// Load image
 			IplImage *img = 0;
-			img = cvLoadImage(vFilenames[i].c_str(),CV_LOAD_IMAGE_COLOR);
+			img = cvLoadImage(vFilenames[i].c_str(), CV_LOAD_IMAGE_COLOR);
 
-			if(!img) {
+			if (!img) {
 				cout << "Could not load image file: " << (trainnegpath + "/" + vFilenames[i]).c_str() << endl;
 				exit(-1);
-			}	
+			}
 
 			// Extract negative training patches
-			if(vBBox.size()==vFilenames.size())
-				Train.extractPatches(img, vFilenames[i].c_str(), samples_neg, 0, &vBBox[i]);
-			else
+			if (vBBox.size() == vFilenames.size()) {
+				// checking if we have multiple lines corresponding to the same image. and increasing i
+				bool mul_im = false;
+				int j = i + 1;
+				while ( j < (int)vFilenames.size()){
+					if (j % 50 == 0 && i % 50 != 0) cout << j << " " << flush;
+					if (!strcmp(vFilenames[i].c_str(), vFilenames[j].c_str())){
+						j++;
+						mul_im = true;
+					}
+					else { break; }
+				}
+				if (mul_im){
+					Train.extractPatchesMul(img, vFilenames[i].c_str(), samples_neg, 0, vBBox, i, j);
+				}
+				else{
+					Train.extractPatches(img, vFilenames[i].c_str(), samples_neg, 0, &vBBox[i]);
+				}
+				i = j;
+			}
+			else {
 				Train.extractPatches(img, vFilenames[i].c_str(), samples_neg, 0);
-
+				i++;
+			}
 			// Release image
 			cvReleaseImage(&img);
-
 		}
-			
 	}
 	cout << endl;
 }
