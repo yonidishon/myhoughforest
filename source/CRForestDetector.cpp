@@ -65,7 +65,9 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 
 					// voting weight for leaf 
 					float w = (*itL)->pfg / float( (*itL)->vCenter.size() * result.size() );
-					ptDet[c] += w;
+					for (int c = 0; c < (int)imgDetect.size(); ++c) {
+						*(ptDet[c]) += w;
+					}
 					// vote for all points stored in the leaf
 					//for(vector<vector<CvPoint> >::const_iterator it = (*itL)->vCenter.begin(); it!=(*itL)->vCenter.end(); ++it) {
 
