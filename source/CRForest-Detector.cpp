@@ -955,8 +955,7 @@ void run_train() {
 	extract_Patches(Train, &cvRNG); 
 
 	// Train forest
-	crForest.trainForest(20, 15, &cvRNG, Train, 2000); //TODO change back to 20
-	//crForest.trainForest(1, 15, &cvRNG, Train, 2000);
+	crForest.trainForest(20, 15, &cvRNG, Train, 2000);
 
 	// Save forest
 	crForest.saveForest(treepath.c_str(), off_tree);

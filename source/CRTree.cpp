@@ -153,9 +153,9 @@ void CRTree::grow(const vector<vector<const PatchFeature*> >& TrainSet, int node
 		int* test = new int[NUMCOL - 1];
 
 		// Set measure mode for split: 0 - classification, 1 - regression
-		unsigned int measure_mode = 1;
-		if( float(TrainSet[0].size()) / float(TrainSet[0].size()+TrainSet[1].size()) >= 0.05 && depth < max_depth-2 )
-			measure_mode = cvRandInt( cvRNG ) % 2;
+		unsigned int measure_mode = 0;
+		//if( float(TrainSet[0].size()) / float(TrainSet[0].size()+TrainSet[1].size()) >= 0.05 && depth < max_depth-2 )
+		//	measure_mode = cvRandInt( cvRNG ) % 2;
 
 		cout << "MeasureMode " << depth << " " << measure_mode << " " << TrainSet[0].size() << " " << TrainSet[1].size() << endl;
 	
