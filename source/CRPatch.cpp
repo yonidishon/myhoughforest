@@ -62,7 +62,7 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 	for (unsigned int c = 0; c<vImg.size(); ++c)
 		cvReleaseImage(&vImg[c]);
 }
-
+// same but for multiple negatvie patches from the same image (when given as sperate BBoxes)
 void CRPatch::extractPatchesMul(IplImage *img, const char* fullpath, unsigned int n, int label, std::vector<CvRect>& box, int startpos,int endpos) {
 	// extract features
 	vector<IplImage*> vImg;
@@ -102,7 +102,7 @@ void CRPatch::extractPatchesMul(IplImage *img, const char* fullpath, unsigned in
 	for (unsigned int c = 0; c<vImg.size(); ++c)
 		cvReleaseImage(&vImg[c]);
 }
-
+// This is the original implementation
 void CRPatch::extractPatches_orig(IplImage *img, unsigned int n, int label, CvRect* box, std::vector<CvPoint>* vCenter) {
 	// extract features
 	vector<IplImage*> vImg;
@@ -151,7 +151,7 @@ void CRPatch::extractPatches_orig(IplImage *img, unsigned int n, int label, CvRe
 	for(unsigned int c=0; c<vImg.size(); ++c)
 		cvReleaseImage(&vImg[c]);
 }
-
+// original inner function of how to extract Feature channels from an image
 void CRPatch::extractFeatureChannels(IplImage *img, std::vector<IplImage*>& vImg) {
 	// 32 feature channels
 	// 7+9 channels: L, a, b, |I_x|, |I_y|, |I_xx|, |I_yy|, HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
@@ -273,14 +273,14 @@ void CRPatch::extractFeatureChannels(IplImage *img, std::vector<IplImage*>& vImg
 
 
 }
-
+// Extra channels (PCAm and PCAs)
 void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath) {
-	// 36 feature channels
+	// 34 feature channels
 	// 7+9 channels: L, a, b, |I_x|, |I_y|, |I_xx|, |I_yy|, HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
-	// 2 channels : PCAm PCAs
-	// 18+18 channels: minfilter + maxfilter on 5x5 neighborhood 
+	// 1 channels : PCAm
+	// 17+17 channels: minfilter + maxfilter on 5x5 neighborhood 
 
-	vImg.resize(36);
+	vImg.resize(34);
 	for (unsigned int c = 0; c<vImg.size(); ++c)
 		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
 
@@ -377,17 +377,17 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 	string rootpath = path.substr(0, path.find_last_of("/\\'"));
 	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
 	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
-	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+	//string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
 
 	vImg[16] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-	vImg[17] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	//vImg[17] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 
 	// min filter
-	for (int c = 0; c<18; ++c)
-		minfilt(vImg[c], vImg[c + 18], 5);
+	for (int c = 0; c<17; ++c)
+		minfilt(vImg[c], vImg[c + 17], 5);
 
 	//max filter
-	for (int c = 0; c<18; ++c)
+	for (int c = 0; c<17; ++c)
 		maxfilt(vImg[c], 5);
 
 
@@ -412,7 +412,7 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 
 
 }
-
+// Only HOG and PCAm + PCAs (No gradients and not color and intensity channels )
 void CRPatch::extractFeatureChannelsPartial(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath ) {
 	// 18 feature channels + 4 features (PCAs , PCAm)x2
 	// 9 channels: HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
