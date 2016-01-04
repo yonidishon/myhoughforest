@@ -214,8 +214,8 @@ void CRTree::grow(const vector<vector<const PatchFeature*> >& TrainSet, int node
 
 		// Set measure mode for split: 0 - classification, 1 - regression
 		unsigned int measure_mode = 0;
-		//if( float(TrainSet[0].size()) / float(TrainSet[0].size()+TrainSet[1].size()) >= 0.05 && depth < max_depth-2 )
-		//	measure_mode = cvRandInt( cvRNG ) % 2;
+		if( float(TrainSet[0].size()) / float(TrainSet[0].size()+TrainSet[1].size()) >= 0.05 && depth < max_depth-2 )
+			measure_mode = cvRandInt( cvRNG ) % 2;
 
 		cout << "MeasureMode " << depth << " " << measure_mode << " " << TrainSet[0].size() << " " << TrainSet[1].size() << endl;
 	
@@ -412,6 +412,44 @@ void CRTree::evaluateTest(std::vector<std::vector<IntIndex> >& valSet, const int
 	}
 }
 
+void CRTree::evaluateTestSub(std::vector<std::vector<IntIndex> >& valSet, const int* test, const std::vector<std::vector<const PatchFeature*> >& TrainSet) {
+	for (unsigned int l = 0; l<TrainSet.size(); ++l) {
+		valSet[l].resize(TrainSet[l].size());
+		for (unsigned int i = 0; i<TrainSet[l].size(); ++i) {
+
+			// pointer to channel
+			const cv::Mat ptC = TrainSet[l][i]->vPatch[test[8]]; //TODO - probably need to add a vPatch for nonZeros (see below)
+			// a1,b1 is the top-left of two sub-patches and a2,b2 defines the right-bottom
+			int xa1 = roi.x + test[0];		int xa2 = xa1 + test[4];
+			int ya1 = roi.y + test[1];		int ya2 = ya1 + test[5];
+			int xb1 = roi.x + test[2];		int xb2 = xb1 + test[6];
+			int yb1 = roi.y + test[3];		int yb2 = yb1 + test[7];
+			// YD: integral image represenation?
+			double mz1 = (ptC.at<double>(ya1, xa1) +
+				ptC.at<double>(ya2, xa2) -
+				ptC.at<double>(ya2, xa1) -
+				ptC.at<double>(ya1, xa2)) /
+				(double)MAX(1, nonZeros.at<double>(ya1, xa1) +
+				nonZeros.at<double>(ya2, xa2) -
+				nonZeros.at<double>(ya2, xa1) -
+				nonZeros.at<double>(ya1, xa2));
+
+			double mz2 = (ptC.at<double>(yb1, xb1) +
+				ptC.at<double>(yb2, xb2) -
+				ptC.at<double>(yb2, xb1) -
+				ptC.at<double>(yb1, xb2)) /
+				(double)MAX(1, nonZeros.at<double>(yb1, xb1) +
+				nonZeros.at<double>(yb2, xb2) -
+				nonZeros.at<double>(yb2, xb1) -
+				nonZeros.at<double>(yb1, xb2));
+
+			//check test
+			valSet[l][i].val = (mz1 - mz2);
+			valSet[l][i].index = i;
+		}
+		sort(valSet[l].begin(), valSet[l].end());
+	}
+}
 void CRTree::split(vector<vector<const PatchFeature*> >& SetA, vector<vector<const PatchFeature*> >& SetB, const vector<vector<const PatchFeature*> >& TrainSet, const vector<vector<IntIndex> >& valSet, int t) {
 	for(unsigned int l = 0; l<TrainSet.size(); ++l) {
 		// search largest value such that val<t 

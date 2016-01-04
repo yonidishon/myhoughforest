@@ -59,7 +59,7 @@ public:
 
 	// Regression
 	const LeafNode* regression(uchar** ptFCh, int stepImg) const;
-	const LeafNode* regressionIntegral(const std::vector< cv::Mat >&, const cv::Mat& nonZeros, const cv::Rect& roi);
+	const LeafNode* regressionIntegral(const std::vector< cv::Mat >& patch, const cv::Mat& nonZeros, const cv::Rect& roi);
 
 	// Training
 	void growTree(const CRPatch& TrData, int samples);
@@ -179,7 +179,7 @@ inline const LeafNode* CRTree::regressionIntegral(const std::vector< cv::Mat >& 
 	while (pnode[0] == -1) {
 
 		const cv::Mat ptC = patch[pnode[9]];
-		// a1,b1 is the 1st sub-patch and a2,b2 defines the 2nd sub-patch
+		// a1,b1 is the top-left of two sub-patches and a2,b2 defines the right-bottom
 		int xa1 = roi.x + pnode[1];		int xa2 = xa1 + pnode[5];
 		int ya1 = roi.y + pnode[2];		int ya2 = ya1 + pnode[6];
 		int xb1 = roi.x + pnode[3];		int xb2 = xb1 + pnode[7];
@@ -224,6 +224,26 @@ inline void CRTree::generateTest(int* test, unsigned int max_w, unsigned int max
 	test[2] = cvRandInt( cvRNG ) % max_w;
 	test[3] = cvRandInt( cvRNG ) % max_h;
 	test[4] = cvRandInt( cvRNG ) % max_c;
+	test[NUMCOL - 2] = 0;
+}
+inline void CRTree::generateTestSub(int* test, unsigned int max_w, unsigned int max_h, unsigned int max_c) {
+	//return value is int array of zize[9] [a1(x,y),b1(x,y),a2(x,y),b2(x,y),channel]
+	
+	// a1,b1 is the top-left of two sub-patches and a2,b2 defines the right-bottom
+	/*	int xa1 = roi.x + pnode[1];		int xa2 = xa1 + pnode[5];
+		int ya1 = roi.y + pnode[2];		int ya2 = ya1 + pnode[6];
+		int xb1 = roi.x + pnode[3];		int xb2 = xb1 + pnode[7];
+		int yb1 = roi.y + pnode[4];		int yb2 = yb1 + pnode[8];*/
+
+	test[0] = cvRandInt(cvRNG) % max_w;				//xa1
+	test[1] = cvRandInt(cvRNG) % max_h;				//ya1
+	test[2] = cvRandInt(cvRNG) % max_w;				//xb1
+	test[3] = cvRandInt(cvRNG) % max_h;				//yb2
+	test[4] = cvRandInt(cvRNG) % (max_w-test[0]);	//xa2
+	test[5] = cvRandInt(cvRNG) % (max_h-test[1]);	//ya2
+	test[6] = cvRandInt(cvRNG) % (max_w--test[2]);	//xb2
+	test[7] = cvRandInt(cvRNG) % (max_h-test[3]);	//yb2
+	test[8] = cvRandInt(cvRNG) % max_c;
 	test[NUMCOL - 2] = 0;
 }
 inline void CRTree::generateTestAve(int* test, unsigned int max_w, unsigned int max_h, int chan) {
