@@ -53,9 +53,13 @@ public:
 	// Set/Get functions
 	unsigned int GetDepth() const {return max_depth;}
 	unsigned int GetNumCenter() const {return num_cp;}
+	int getPatchWidth() const { return m_pwidth; }
+	int getPatchHeight() const { return m_pheight; }
+	int getNoChannels() const { return m_no_chans; }
 
 	// Regression
 	const LeafNode* regression(uchar** ptFCh, int stepImg) const;
+	const LeafNode* regressionIntegral(const std::vector< cv::Mat >&, const cv::Mat& nonZeros, const cv::Rect& roi);
 
 	// Training
 	void growTree(const CRPatch& TrData, int samples);
@@ -66,7 +70,7 @@ public:
 		for(unsigned int l=0; l<num_leaf; ++l)
 			leaf[l].show(5000, width, height);
 	}
-
+	bool loadTree(const char* filename);
 private: 
 
 	// Private functions for training
@@ -85,7 +89,7 @@ private:
 
 
 	// Data structure
-
+	int m_pwidth, m_pheight, m_no_chans;
 	// tree table
 	// 2^(max_depth+1)-1 x NUMCOL matrix as vector
 	// column: leafindex x1 y1 x2 y2 channel thres
@@ -115,7 +119,7 @@ private:
 
 	CvRNG *cvRNG;
 };
-
+// regression
 inline const LeafNode* CRTree::regression(uchar** ptFCh, int stepImg) const {
 	// pointer to current node
 	const int* pnode = &treetable[0];
@@ -164,6 +168,53 @@ inline const LeafNode* CRTree::regression(uchar** ptFCh, int stepImg) const {
 
 	// return leaf
 	return &leaf[pnode[0]];
+}
+inline const LeafNode* CRTree::regressionIntegral(const std::vector< cv::Mat >& patch, const cv::Mat& nonZeros, const cv::Rect& roi) {
+
+	// pointer to current node
+	const int* pnode = &treetable[0];
+	int node = 0;
+
+	// Go through tree until one arrives at a leaf, i.e. pnode[0]>=0)
+	while (pnode[0] == -1) {
+
+		const cv::Mat ptC = patch[pnode[9]];
+		// a1,b1 is the 1st sub-patch and a2,b2 defines the 2nd sub-patch
+		int xa1 = roi.x + pnode[1];		int xa2 = xa1 + pnode[5];
+		int ya1 = roi.y + pnode[2];		int ya2 = ya1 + pnode[6];
+		int xb1 = roi.x + pnode[3];		int xb2 = xb1 + pnode[7];
+		int yb1 = roi.y + pnode[4];		int yb2 = yb1 + pnode[8];
+		// YD: integral image represenation?
+		double mz1 = (ptC.at<double>(ya1, xa1) +
+			ptC.at<double>(ya2, xa2) -
+			ptC.at<double>(ya2, xa1) -
+			ptC.at<double>(ya1, xa2)) /
+			(double)MAX(1, nonZeros.at<double>(ya1, xa1) +
+			nonZeros.at<double>(ya2, xa2) -
+			nonZeros.at<double>(ya2, xa1) -
+			nonZeros.at<double>(ya1, xa2));
+
+		double mz2 = (ptC.at<double>(yb1, xb1) +
+			ptC.at<double>(yb2, xb2) -
+			ptC.at<double>(yb2, xb1) -
+			ptC.at<double>(yb1, xb2)) /
+			(double)MAX(1, nonZeros.at<double>(yb1, xb1) +
+			nonZeros.at<double>(yb2, xb2) -
+			nonZeros.at<double>(yb2, xb1) -
+			nonZeros.at<double>(yb1, xb2));
+
+		//check test
+		int test = ((mz1 - mz2) >= (double)pnode[10]);
+
+		//the test result sends the patch to one of the children nodes
+		int incr = node + 1 + test;
+		node += incr;
+		pnode += incr*TEST_DIM;
+
+	}
+
+	return &leaf[pnode[0]];
+
 }
 // randomally select two pixels in the patch and the channel
 inline void CRTree::generateTest(int* test, unsigned int max_w, unsigned int max_h, unsigned int max_c) {
