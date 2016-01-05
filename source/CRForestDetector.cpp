@@ -55,8 +55,7 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 			vector<const LeafNode*> result;
 			crForest->regression(result, ptFCh_row, stepImg);
 			
-			// vote for all trees (leafs)
-			int tot_patch = 0;
+			// vote for all trees (leafs) 
 			for(vector<const LeafNode*>::const_iterator itL = result.begin(); itL!=result.end(); ++itL) {
 
 				// To speed up the voting, one can vote only for patches 
@@ -64,33 +63,25 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 			        // 
 				//if((*itL)->pfg>0.5) {
 
-					// voting weight for leaf
-				if (!(*itL)->vCenter.size()) {
-					continue;
-				}
-				tot_patch += (*itL)->vCenter.size();
-				float w = (*itL)->pfg * float( (*itL)->vCenter.size());
-					for (int c = 0; c < (int)imgDetect.size(); ++c) {
-						*(ptDet[c] + cx + cy*stepDet) += w;
-					}
-					// vote for all points stored in the leaf
-					//for(vector<vector<CvPoint> >::const_iterator it = (*itL)->vCenter.begin(); it!=(*itL)->vCenter.end(); ++it) {
+					// voting weight for leaf 
+					float w = (*itL)->pfg / float( (*itL)->vCenter.size() * result.size() );
 
-					//	for(int c=0; c<(int)imgDetect.size(); ++c) {
-					//	  int x = int(cx - (*it)[0].x * ratios[c] + 0.5);
-					//	  int y = cy-(*it)[0].y;
-					//	  if(y>=0 && y<imgDetect[c]->height && x>=0 && x<imgDetect[c]->width) {
-					//	    *(ptDet[c]+x+y*stepDet) += w;
-					//	  }
-					//	}
-					//}
+					// vote for all points stored in the leaf
+					for(vector<vector<CvPoint> >::const_iterator it = (*itL)->vCenter.begin(); it!=(*itL)->vCenter.end(); ++it) {
+
+						for(int c=0; c<(int)imgDetect.size(); ++c) {
+						  int x = int(cx - (*it)[0].x * ratios[c] + 0.5);
+						  int y = cy-(*it)[0].y;
+						  if(y>=0 && y<imgDetect[c]->height && x>=0 && x<imgDetect[c]->width) {
+						    *(ptDet[c]+x+y*stepDet) += w;
+						  }
+						}
+					}
 
 				// } // end if
 
 			}
-			for (int c = 0; c < (int)imgDetect.size(); ++c) {
-				*(ptDet[c] + cx + cy*stepDet) = *(ptDet[c] + cx + cy*stepDet) / float(tot_patch);
-			}
+
 			// increase pointer - x
 			for(unsigned int c=0; c<vImg.size(); ++c)
 				++ptFCh_row[c];

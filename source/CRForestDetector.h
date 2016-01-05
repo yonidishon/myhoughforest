@@ -9,7 +9,6 @@
 #include <ctime>
 #include <queue>
 #include <opencv2/core/core.hpp>
-#include <fstream>
 
 
 class CRForestDetector {
