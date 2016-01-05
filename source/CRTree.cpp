@@ -25,8 +25,8 @@ CRTree::CRTree(const char* filename) {
 		// allocate memory for tree table
 		in >> max_depth;
 		num_nodes = (int)pow(2.0,int(max_depth+1))-1;
-		// num_nodes x NUMCOL matrix as vector ([leafindex,x1,y1,x2,y2,chan,th]-leafindex (if not leaf == -1),x1,y1,x2,y2 (coordinates for test to perform),channel,thres (chosen in random))
-		treetable = new int[num_nodes * NUMCOL];
+		// num_nodes x NUM_COL matrix as vector ([leafindex,x1,y1,x2,y2,chan,th]-leafindex (if not leaf == -1),x1,y1,x2,y2 (coordinates for test to perform),channel,thres (chosen in random))
+		treetable = new int[num_nodes * NUM_COL];
 		int* ptT = &treetable[0];
 		
 		// allocate memory for leafs
@@ -39,7 +39,7 @@ CRTree::CRTree(const char* filename) {
 		// read tree nodes
 		for(unsigned int n=0; n<num_nodes; ++n) {
 			in >> dummy; in >> dummy;
-			for (unsigned int i = 0; i<NUMCOL; ++i, ++ptT) {
+			for (unsigned int i = 0; i<NUM_COL; ++i, ++ptT) {
 				in >> *ptT;
 			}
 		}
@@ -95,7 +95,7 @@ bool CRTree::saveTree(const char* filename) const {
 			}
 
 			out << n << " " << depth << " ";
-			for (unsigned int i = 0; i<NUMCOL; ++i, ++ptT) {
+			for (unsigned int i = 0; i<NUM_COL; ++i, ++ptT) {
 				out << *ptT << " ";
 			}
 			out << endl;
@@ -123,7 +123,7 @@ bool CRTree::saveTree(const char* filename) const {
 
 	return done;
 }
-bool CRTree::loadTree(const char* filename) {
+/*bool CRTree::loadTree(const char* filename) {
 
 	cout << "Load Tree (BIN) " << filename << " " << flush;
 	int dummy;
@@ -144,7 +144,7 @@ bool CRTree::loadTree(const char* filename) {
 
 	num_nodes = (int)pow(2.0, int(max_depth + 1)) - 1;   // compute number of existing nodes
 
-	treetable = new int[num_nodes * TEST_DIM];   // num_nodes x test size: [index, x1,y1,x2,y,2,w1,h1,w2,h2,channel,threshold]
+	treetable = new int[num_nodes * NUM_COL];   // num_nodes x test size: [index, x1,y1,x2,y,2,w1,h1,w2,h2,channel,threshold]
 	int* ptT = &treetable[0];                    // get pointer to the tree table
 
 	// get number of leaves from text file
@@ -157,7 +157,7 @@ bool CRTree::loadTree(const char* filename) {
 		success &= (fread(&dummy, sizeof(int), 1, fp) == 1);
 
 		//read in the test parameters
-		for (unsigned int i = 0; i<TEST_DIM; ++i, ++ptT){
+		for (unsigned int i = 0; i<NUM_COL; ++i, ++ptT){
 			success &= (fread(ptT, sizeof(int), 1, fp) == 1);
 		}
 
@@ -181,7 +181,7 @@ bool CRTree::loadTree(const char* filename) {
 
 	return success;
 
-}
+}*/
 /////////////////////// Training Function /////////////////////////////
 
 // Start grow tree
@@ -210,7 +210,7 @@ void CRTree::grow(const vector<vector<const PatchFeature*> >& TrainSet, int node
 
 		vector<vector<const PatchFeature*> > SetA;
 		vector<vector<const PatchFeature*> > SetB;
-		int* test = new int[NUMCOL - 1];
+		int* test = new int[NUM_COL - 1];
 
 		// Set measure mode for split: 0 - classification, 1 - regression
 		unsigned int measure_mode = 0;
@@ -221,11 +221,11 @@ void CRTree::grow(const vector<vector<const PatchFeature*> >& TrainSet, int node
 	
 		// Find optimal test
 		if( optimizeTest(SetA, SetB, TrainSet, test, samples, measure_mode) ) {
-			// cout << "Channel is:" << test[4] << "; Test Mode (1 - ave 0 - pixel):" << test[NUMCOL - 2] << endl;
+			// cout << "Channel is:" << test[4] << "; Test Mode (1 - ave 0 - pixel):" << test[NUM_COL - 2] << endl;
 			// Store binary test for current node
-			int* ptT = &treetable[node*NUMCOL];
+			int* ptT = &treetable[node*NUM_COL];
 			ptT[0] = -1; ++ptT; 
-			for (int t = 0; t<NUMCOL-1; ++t)
+			for (int t = 0; t<NUM_COL - 1; ++t)
 				ptT[t] = test[t];
 
 			double countA = 0;
@@ -277,7 +277,7 @@ void CRTree::grow(const vector<vector<const PatchFeature*> >& TrainSet, int node
 // Create leaf node from patches 
 void CRTree::makeLeaf(const std::vector<std::vector<const PatchFeature*> >& TrainSet, float pnratio, int node) {
 	// Get pointer
-	treetable[node*NUMCOL] = num_leaf;
+	treetable[node*NUM_COL] = num_leaf;
 	LeafNode* ptL = &leaf[num_leaf];
 
 	// Store data
@@ -304,7 +304,7 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 	double tmpDist;
 	// maximize!!!!
 	double bestDist = -DBL_MAX; 
-	int* tmpTest=new int[NUMCOL-1];
+	int* tmpTest = new int[NUM_COL - 1];
 
 	// Find best test of ITER iterations
 	for(unsigned int i =0; i<iter; ++i) {
@@ -360,7 +360,7 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 						// saving [x1,y1,x2,y2,chan]
 						for(int t=0; t<5;++t) test[t] = tmpTest[t];
 						test[5] = tr; //saving the best thershold to the test *int Arrray
-						test[NUMCOL - 2] = tmpTest[NUMCOL - 2];
+						test[NUM_COL - 2] = tmpTest[NUM_COL - 2];
 						SetA = tmpA;
 						SetB = tmpB;
 					}
@@ -385,7 +385,7 @@ void CRTree::evaluateTest(std::vector<std::vector<IntIndex> >& valSet, const int
 
 			// pointer to channel
 			CvMat* ptC = TrainSet[l][i]->vPatch[test[4]];
-			switch (test[NUMCOL - 2]){ // last column has the type of test currently only pixel based and average of patch
+			switch (test[NUM_COL - 2]){ // last column has the type of test currently only pixel based and average of patch
 			case 1: {//patch mean
 						int patchSum = 0;
 						int numel = 0;
@@ -418,26 +418,26 @@ void CRTree::evaluateTestSub(std::vector<std::vector<IntIndex> >& valSet, const 
 		for (unsigned int i = 0; i<TrainSet[l].size(); ++i) {
 
 			// pointer to channel
-			const cv::Mat ptC = TrainSet[l][i]->vPatch[test[8]]; //TODO - probably need to add a vPatch for nonZeros (see below)
+			CvMat* ptC = TrainSet[l][i]->vPatch[test[8]]; //TODO - probably need to add a vPatch for nonZeros (see below)
 			// a1,b1 is the top-left of two sub-patches and a2,b2 defines the right-bottom
-			int xa1 = roi.x + test[0];		int xa2 = xa1 + test[4];
-			int ya1 = roi.y + test[1];		int ya2 = ya1 + test[5];
-			int xb1 = roi.x + test[2];		int xb2 = xb1 + test[6];
-			int yb1 = roi.y + test[3];		int yb2 = yb1 + test[7];
+			int xa1 = TrainSet[l][i]->roi.x + test[0];		int xa2 = xa1 + test[4];
+			int ya1 = TrainSet[l][i]->roi.y + test[1];		int ya2 = ya1 + test[5];
+			int xb1 = TrainSet[l][i]->roi.x + test[2];		int xb2 = xb1 + test[6];
+			int yb1 = TrainSet[l][i]->roi.y + test[3];		int yb2 = yb1 + test[7];
 			// YD: integral image represenation?
-			double mz1 = (ptC.at<double>(ya1, xa1) +
-				ptC.at<double>(ya2, xa2) -
-				ptC.at<double>(ya2, xa1) -
-				ptC.at<double>(ya1, xa2)) /
+			double mz1 = ((int)*(uchar*)cvPtr2D(ptC,ya1, xa1) +
+				(int)*(uchar*)cvPtr2D(ptC,ya2, xa2) -
+				(int)*(uchar*)cvPtr2D(ptC,ya2, xa1) -
+				(int)*(uchar*)cvPtr2D(ptC,ya1, xa2)) /
 				(double)MAX(1, nonZeros.at<double>(ya1, xa1) +
 				nonZeros.at<double>(ya2, xa2) -
 				nonZeros.at<double>(ya2, xa1) -
-				nonZeros.at<double>(ya1, xa2));
+				nonZeros.at<double>(ya1, xa2)); // NONZERO in my case should be all ones
 
-			double mz2 = (ptC.at<double>(yb1, xb1) +
-				ptC.at<double>(yb2, xb2) -
-				ptC.at<double>(yb2, xb1) -
-				ptC.at<double>(yb1, xb2)) /
+			double mz2 = ((int)*(uchar*)cvPtr2D(ptC,yb1, xb1) +
+				(int)*(uchar*)cvPtr2D(ptC,yb2, xb2) -
+				(int)*(uchar*)cvPtr2D(ptC,yb2, xb1) -
+				(int)*(uchar*)cvPtr2D(ptC,yb1, xb2)) /
 				(double)MAX(1, nonZeros.at<double>(yb1, xb1) +
 				nonZeros.at<double>(yb2, xb2) -
 				nonZeros.at<double>(yb2, xb1) -
@@ -450,6 +450,7 @@ void CRTree::evaluateTestSub(std::vector<std::vector<IntIndex> >& valSet, const 
 		sort(valSet[l].begin(), valSet[l].end());
 	}
 }
+
 void CRTree::split(vector<vector<const PatchFeature*> >& SetA, vector<vector<const PatchFeature*> >& SetB, const vector<vector<const PatchFeature*> >& TrainSet, const vector<vector<IntIndex> >& valSet, int t) {
 	for(unsigned int l = 0; l<TrainSet.size(); ++l) {
 		// search largest value such that val<t 

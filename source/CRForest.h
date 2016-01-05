@@ -39,7 +39,7 @@ public:
 	// IO functions
 	void saveForest(const char* filename, unsigned int offset = 0);
 	void loadForest(const char* filename, int type = 0);
-	bool loadForestPatch(const char* filename);
+	//bool loadForestPatch(const char* filename); - YD TODO
 	void show(int w, int h) const {vTrees[0]->showLeaves(w,h);}
 
 	// Trees
@@ -84,7 +84,7 @@ inline void CRForest::loadForest(const char* filename, int type) {
 		vTrees[i] = new CRTree(buffer);
 	}
 }
-inline bool CRForest::loadForestPatch(const char* filename) {
+/*inline bool CRForest::loadForestPatch(const char* filename) {
 
 	char buffer[200];
 	bool success = true;
@@ -94,4 +94,4 @@ inline bool CRForest::loadForestPatch(const char* filename) {
 		success &= vTrees[i]->loadTree(buffer);
 	}
 	return success;
-}
+}*/

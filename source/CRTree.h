@@ -11,6 +11,16 @@
 #include <iostream>
 #include <fstream>
 
+// if NUMCOL ==7 => column: leafindex x1 y1 x2 y2 channel thres
+// if NUMCOL ==8 => column: leafindex x1 y1 x2 y2 channel thres testflag
+//int NUMCOL = 8; // 7 number of columns in the tree table
+
+#define NUM_COL 8
+//#define TEST_DIM 11
+#define POSE_SIZE 6
+#define AVG_FACE_DIAMETER 236.4f
+#define AVG_FACE_DIAMETER2 55884.96f
+
 // Auxilary structure
 struct IntIndex {
 	double val;
@@ -43,8 +53,8 @@ public:
 		num_nodes = (int)pow(2.0,int(max_depth+1))-1;
 		// num_nodes x NUMCOL matrix as vector
 		//treetable = [leafindex,x1,y1,x2,y2,ch,th,testkind]
-		treetable = new int[num_nodes * NUMCOL];
-		for (unsigned int i = 0; i<num_nodes * NUMCOL; ++i) treetable[i] = 0;
+		treetable = new int[num_nodes * NUM_COL];
+		for (unsigned int i = 0; i<num_nodes * NUM_COL; ++i) treetable[i] = 0;
 		// allocate memory for leafs
 		leaf = new LeafNode[(int)pow(2.0,int(max_depth))];
 	}
@@ -70,7 +80,7 @@ public:
 		for(unsigned int l=0; l<num_leaf; ++l)
 			leaf[l].show(5000, width, height);
 	}
-	bool loadTree(const char* filename);
+	//bool loadTree(const char* filename); YD - seems unseccary (new code)
 private: 
 
 	// Private functions for training
@@ -79,7 +89,9 @@ private:
 	bool optimizeTest(std::vector<std::vector<const PatchFeature*> >& SetA, std::vector<std::vector<const PatchFeature*> >& SetB, const std::vector<std::vector<const PatchFeature*> >& TrainSet, int* test, unsigned int iter, unsigned int mode);
 	void generateTest(int* test, unsigned int max_w, unsigned int max_h, unsigned int max_c);
 	void generateTestAve(int* test, unsigned int max_w, unsigned int max_h, int chan);
+	void generateTestSub(int* test, unsigned int max_w, unsigned int max_h, unsigned int max_c);
 	void evaluateTest(std::vector<std::vector<IntIndex> >& valSet, const int* test, const std::vector<std::vector<const PatchFeature*> >& TrainSet);
+	void evaluateTestSub(std::vector<std::vector<IntIndex> >& valSet, const int* test, const std::vector<std::vector<const PatchFeature*> >& TrainSet);
 	void split(std::vector<std::vector<const PatchFeature*> >& SetA, std::vector<std::vector<const PatchFeature*> >& SetB, const std::vector<std::vector<const PatchFeature*> >& TrainSet, const std::vector<std::vector<IntIndex> >& valSet, int t);
 	double measureSet(const std::vector<std::vector<const PatchFeature*> >& SetA, const std::vector<std::vector<const PatchFeature*> >& SetB, unsigned int mode) {
 	  if (mode==0) return InfGain(SetA, SetB); else return -distMean(SetA[1],SetB[1]);
@@ -91,13 +103,10 @@ private:
 	// Data structure
 	int m_pwidth, m_pheight, m_no_chans;
 	// tree table
-	// 2^(max_depth+1)-1 x NUMCOL matrix as vector
+	// 2^(max_depth+1)-1 x NUM_COL matrix as vector
 	// column: leafindex x1 y1 x2 y2 channel thres
 	// if node is not a leaf, leaf=-1
 	int* treetable;
-	// if NUMCOL ==7 => column: leafindex x1 y1 x2 y2 channel thres
-	// if NUMCOL ==8 => column: leafindex x1 y1 x2 y2 channel thres testflag
-	int NUMCOL = 8; // 7 number of columns in the tree table
 
 	// stop growing when number of patches is less than min_samples
 	unsigned int min_samples;
@@ -136,7 +145,7 @@ inline const LeafNode* CRTree::regression(uchar** ptFCh, int stepImg) const {
 	
 		// test
 		bool test;
-		switch (pnode[NUMCOL-1]){ // last column has the type of test currently only pixel based and average of patch
+		switch (pnode[NUM_COL-1]){ // last column has the type of test currently only pixel based and average of patch
 		case 1: {//patch mean
 			int patchSum = 0;
 			int numel = 0;
@@ -147,14 +156,14 @@ inline const LeafNode* CRTree::regression(uchar** ptFCh, int stepImg) const {
 				}
 			}
 			double patchAve = patchSum / numel;
-			test = (patchAve) >= pnode[NUMCOL-2];
+			test = (patchAve) >= pnode[NUM_COL-2];
 			break;
 		}
 		default: { // pixel test
 			// get pixel values 
 			int p1 = *(ptC + pnode[1] + pnode[2] * stepImg);
 			int p2 = *(ptC + pnode[3] + pnode[4] * stepImg);
-			test = (p1 - p2) >= pnode[NUMCOL-2];
+			test = (p1 - p2) >= pnode[NUM_COL - 2];
 			break;
 		}
 		}
@@ -163,7 +172,7 @@ inline const LeafNode* CRTree::regression(uchar** ptFCh, int stepImg) const {
 		// increment node/pointer by node_id + 1 + test
 		int incr = node+1+test;
 		node += incr;
-		pnode += incr*NUMCOL;
+		pnode += incr*NUM_COL;
 	}
 
 	// return leaf
@@ -209,7 +218,7 @@ inline const LeafNode* CRTree::regressionIntegral(const std::vector< cv::Mat >& 
 		//the test result sends the patch to one of the children nodes
 		int incr = node + 1 + test;
 		node += incr;
-		pnode += incr*TEST_DIM;
+		pnode += incr*NUM_COL;
 
 	}
 
@@ -224,7 +233,7 @@ inline void CRTree::generateTest(int* test, unsigned int max_w, unsigned int max
 	test[2] = cvRandInt( cvRNG ) % max_w;
 	test[3] = cvRandInt( cvRNG ) % max_h;
 	test[4] = cvRandInt( cvRNG ) % max_c;
-	test[NUMCOL - 2] = 0;
+	test[NUM_COL - 2] = 0;
 }
 inline void CRTree::generateTestSub(int* test, unsigned int max_w, unsigned int max_h, unsigned int max_c) {
 	//return value is int array of zize[9] [a1(x,y),b1(x,y),a2(x,y),b2(x,y),channel]
@@ -241,10 +250,10 @@ inline void CRTree::generateTestSub(int* test, unsigned int max_w, unsigned int 
 	test[3] = cvRandInt(cvRNG) % max_h;				//yb2
 	test[4] = cvRandInt(cvRNG) % (max_w-test[0]);	//xa2
 	test[5] = cvRandInt(cvRNG) % (max_h-test[1]);	//ya2
-	test[6] = cvRandInt(cvRNG) % (max_w--test[2]);	//xb2
+	test[6] = cvRandInt(cvRNG) % (max_w-test[2]);	//xb2
 	test[7] = cvRandInt(cvRNG) % (max_h-test[3]);	//yb2
 	test[8] = cvRandInt(cvRNG) % max_c;
-	test[NUMCOL - 2] = 0;
+	test[NUM_COL - 2] = 0;
 }
 inline void CRTree::generateTestAve(int* test, unsigned int max_w, unsigned int max_h, int chan) {
 	//return value is int array of zize[5] [p1(x,y),p2(x,y),channel]
@@ -253,5 +262,5 @@ inline void CRTree::generateTestAve(int* test, unsigned int max_w, unsigned int 
 	test[2] = max_w-1;
 	test[3] = max_h-1;
 	test[4] = chan;
-	test[NUMCOL - 2] = 1;
+	test[NUM_COL - 2] = 1;
 }
