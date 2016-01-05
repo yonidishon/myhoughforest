@@ -15,14 +15,14 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 	// extract features
 	vector<IplImage*> vImg;
 	//CRPatch::extractFeatureChannels(img, vImg);
-	CRPatch::extractFeatureChannelsExtra(img, vImg, imfile);
+	CRPatch::extractFeatureChannelsExtra(img, vImg, imfile); //vImg are features map size(Img)
 
 	// reset output image
 	for(int c=0; c<(int)imgDetect.size(); ++c)
 		cvSetZero( imgDetect[c] );
 
 	// get pointers to feature channels
-	int stepImg;
+	int stepImg; //size in pixels of one row of Img
 	uchar** ptFCh     = new uchar*[vImg.size()];
 	uchar** ptFCh_row = new uchar*[vImg.size()];
 	for(unsigned int c=0; c<vImg.size(); ++c) {
@@ -61,7 +61,7 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 				// To speed up the voting, one can vote only for patches 
 			        // with a probability for foreground > 0.5
 			        // 
-				//if((*itL)->pfg>0.5) {
+				if((*itL)->pfg>=1) {
 
 					// voting weight for leaf 
 					float w = (*itL)->pfg / float( (*itL)->vCenter.size() * result.size() );
@@ -78,7 +78,7 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 						}
 					}
 
-				// } // end if
+				} // end if
 
 			}
 
