@@ -24,6 +24,7 @@ CRTree::CRTree(const char* filename) {
 		in >> max_depth;
 		num_nodes = (int)pow(2.0,int(max_depth+1))-1;
 		// num_nodes x NUMCOL matrix as vector ([leafindex,x1,y1,x2,y2,chan,th]-leafindex (if not leaf == -1),x1,y1,x2,y2 (coordinates for test to perform),channel,thres (chosen in random))
+		// [leafindex, xa1, ya1, xb1, yb1,xa2, ya2, xb2, yb2, chan, th]
 		treetable = new int[num_nodes * NUMCOL];
 		int* ptT = &treetable[0];
 		
@@ -256,7 +257,7 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 		}
 
 		// generate binary test without threshold
-		if (i < TrainSet[1][0]->vPatch.size()){ //first we choose test of patch mean for all channels
+		if (i < TrainSet[1][0]->vPatch.size()){ //first we choose test of patch mean - FOR ALL CHANNEL 
 			generateTestAve(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, i);
 		}
 		else{ 
@@ -298,8 +299,9 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 						found = true;
 						bestDist = tmpDist;
 						// saving [x1,y1,x2,y2,chan]
-						for(int t=0; t<5;++t) test[t] = tmpTest[t];
-						test[5] = tr; //saving the best thershold to the test *int Arrray
+						// saving [xa1,ya1,xb1,yb1,xa2,ya2,xb2,yb2,chan]
+						for(int t=0; t<9;++t) test[t] = tmpTest[t];
+						test[9] = tr; //saving the best thershold to the test *int Arrray
 						test[NUMCOL - 2] = tmpTest[NUMCOL - 2];
 						SetA = tmpA;
 						SetB = tmpB;
@@ -324,7 +326,7 @@ void CRTree::evaluateTest(std::vector<std::vector<IntIndex> >& valSet, const int
 		for(unsigned int i=0;i<TrainSet[l].size();++i) {
 
 			// pointer to channel
-			CvMat* ptC = TrainSet[l][i]->vPatch[test[4]];
+			CvMat* ptC = TrainSet[l][i]->vPatch[test[8]];
 			switch (test[NUMCOL - 2]){ // last column has the type of test currently only pixel based and average of patch
 			case 1: {//patch mean
 						int patchSum = 0;
@@ -338,11 +340,34 @@ void CRTree::evaluateTest(std::vector<std::vector<IntIndex> >& valSet, const int
 						valSet[l][i].val = patchSum /(double) numel;
 						break;
 			}
-			default: { // pixel test
-						 // get pixel values 
-						 int p1 = (int)*(uchar*)cvPtr2D(ptC, test[1], test[0]);
-						 int p2 = (int)*(uchar*)cvPtr2D(ptC, test[3], test[2]);
-						 valSet[l][i].val = p1 - p2;
+			default: { // subpatches test
+						 // subpatches test pnode = [leafindex xa1 ya1 xb1 yb2 xa2 ya2 xb2 yb2 channel thres testflag]
+						 //						    [ 	0	    1	2   3   4   5   6   7   8     9      10     11   ]
+						 // test has no leafindex and no test flag
+						 int patch1sum = 0;
+						 int patch2sum = 0;
+						 int numelpatch1 = 0;
+						 int numelpathc2 = 0;
+
+						 //subpatch A
+						 for (int y = test[1]; y < test[5] + 1; y++){
+							 for (int x = test[0]; x < test[4] + 1; x++){
+								 patch1sum += (int)*(uchar*)cvPtr2D(ptC, y, x);
+								 numelpatch1++;
+							 }
+						 }
+						 double Patch1ave = patch1sum / (double)numelpatch1;
+						 
+						 //subpatch B
+						 for (int y = test[3]; y < test[7] + 1; y++){
+							 for (int x = test[2]; x < test[6] + 1; x++){
+								 patch2sum += (int)*(uchar*)cvPtr2D(ptC, y, x);
+								 numelpathc2++;
+							 }
+						 }
+						 double Patch2ave = patch2sum / (double)numelpathc2;
+						 //calculate sub-patch difference
+						 valSet[l][i].val = Patch1ave - Patch2ave;
 						 break;
 			}
 			}

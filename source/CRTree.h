@@ -91,9 +91,10 @@ private:
 	// column: leafindex x1 y1 x2 y2 channel thres
 	// if node is not a leaf, leaf=-1
 	int* treetable;
-	// if NUMCOL ==7 => column: leafindex x1 y1 x2 y2 channel thres
-	// if NUMCOL ==8 => column: leafindex x1 y1 x2 y2 channel thres testflag
-	int NUMCOL = 8; // 7 number of columns in the tree table
+	// if NUMCOL == 7 => column: leafindex x1 y1 x2 y2 channel thres
+	// if NUMCOL == 8 => column: leafindex x1 y1 x2 y2 channel thres testflag (support Ave of all patch test)
+	// if NUMCOL == 12 => column: leafindex xa1 ya1 xb1 yb2 xa2 ya2 xb2 yb2 channel thres testflag (support sub-patch tests)
+	int NUMCOL = 12;
 
 	// stop growing when number of patches is less than min_samples
 	unsigned int min_samples;
@@ -126,9 +127,11 @@ inline const LeafNode* CRTree::regression(uchar** ptFCh, int stepImg) const {
 		// binary test 0 - left, 1 - right
 		// Note that x, y are changed since the patches are given as matrix and not as image 
 		// p1 - p2 < t -> left is equal to (p1 - p2 >= t) == false
-		
+		// subpatches test pnode = [leafindex xa1 ya1 xb1 yb2 xa2 ya2 xb2 yb2 channel thres testflag]
+		//						  [ 	0	  1	  2   3   4   5   6   7   8     9      10     11   ]
+		// test has no leafindex and no test flag
 		// Choosing the channel
-		uchar* ptC = ptFCh[pnode[5]];
+		uchar* ptC = ptFCh[pnode[9]];
 	
 		// test
 		bool test;
@@ -146,11 +149,34 @@ inline const LeafNode* CRTree::regression(uchar** ptFCh, int stepImg) const {
 			test = (patchAve) >= pnode[NUMCOL-2];
 			break;
 		}
-		default: { // pixel test
-			// get pixel values 
-			int p1 = *(ptC + pnode[1] + pnode[2] * stepImg);
-			int p2 = *(ptC + pnode[3] + pnode[4] * stepImg);
-			test = (p1 - p2) >= pnode[NUMCOL-2];
+		default: { // subpatches test pnode = [leafindex xa1 ya1 xb1 yb2 xa2 ya2 xb2 yb2 channel thres testflag]
+				   //						  [ 	0	  1	  2   3   4   5   6   7   8     9      10     11   ]
+				   // test has no leafindex and no test flag
+
+			int patch1sum = 0;
+			int patch2sum = 0;
+			int numelpatch1 = 0;
+			int numelpathc2 = 0;
+
+			//subpatch A
+			for (int y = pnode[2]; y < pnode[6] + 1; y++){
+				for (int x = pnode[1]; x < pnode[5] + 1; x++){
+					patch1sum += *(ptC + x + y * stepImg);
+					numelpatch1++;
+				}
+			}
+			double Patch1ave = patch1sum / (double)numelpatch1;
+
+			//subpatch B
+			for (int y = pnode[4]; y < pnode[8] + 1; y++){
+				for (int x = pnode[3]; x < pnode[7] + 1; x++){
+					patch2sum += *(ptC + x + y * stepImg);
+					numelpathc2++;
+				}
+			}
+			double Patch2ave = patch2sum / (double)numelpathc2;
+			//calculate sub-patch difference
+			test = (Patch1ave - Patch2ave) >= pnode[NUMCOL-2];
 			break;
 		}
 		}
@@ -167,20 +193,38 @@ inline const LeafNode* CRTree::regression(uchar** ptFCh, int stepImg) const {
 }
 // randomally select two pixels in the patch and the channel
 inline void CRTree::generateTest(int* test, unsigned int max_w, unsigned int max_h, unsigned int max_c) {
-	//return value is int array of zize[5] [p1(x,y),p2(x,y),channel]
-	test[0] = cvRandInt( cvRNG ) % max_w;
-	test[1] = cvRandInt( cvRNG ) % max_h;
-	test[2] = cvRandInt( cvRNG ) % max_w;
-	test[3] = cvRandInt( cvRNG ) % max_h;
-	test[4] = cvRandInt( cvRNG ) % max_c;
-	test[NUMCOL - 2] = 0;
+	//return value is int array of zize[9] [a1(x,y),b1(x,y),a2(x,y),b2(x,y),channel]
+
+	// a1,b1 is the top-left of two sub-patches and a2,b2 defines the right-bottom
+	/*	int xa1 = roi.x + pnode[1];		int xa2 = xa1 + pnode[5];
+	int ya1 = roi.y + pnode[2];		int ya2 = ya1 + pnode[6];
+	int xb1 = roi.x + pnode[3];		int xb2 = xb1 + pnode[7];
+	int yb1 = roi.y + pnode[4];		int yb2 = yb1 + pnode[8];*/
+
+	test[0] = cvRandInt(cvRNG) % max_w;				//xa1
+	test[1] = cvRandInt(cvRNG) % max_h;				//ya1
+	test[2] = cvRandInt(cvRNG) % max_w;				//xb1
+	test[3] = cvRandInt(cvRNG) % max_h;				//yb2
+	test[4] = MAX(cvRandInt(cvRNG) % (max_w - test[0]),1);	//xa2
+	test[5] = MAX(cvRandInt(cvRNG) % (max_h - test[1]),1);	//ya2
+	test[6] = MAX(cvRandInt(cvRNG) % (max_w - test[2]),1);	//xb2
+	test[7] = MAX(cvRandInt(cvRNG) % (max_h - test[3]),1);	//yb2
+	test[8] = cvRandInt(cvRNG) % max_c;
+	test[NUMCOL - 2] = 0; // because thersh is between (in test[9]) the flag and roi
 }
 inline void CRTree::generateTestAve(int* test, unsigned int max_w, unsigned int max_h, int chan) {
 	//return value is int array of zize[5] [p1(x,y),p2(x,y),channel]
+	// subpatches test pnode = [leafindex xa1 ya1 xb1 yb2 xa2 ya2 xb2 yb2 channel thres testflag]
+	//						  [ 	0	  1	  2   3   4   5   6   7   8     9      10     11   ]
+	// test has no leafindex and no test flag
 	test[0] = 0;
 	test[1] = 0;
 	test[2] = max_w-1;
 	test[3] = max_h-1;
-	test[4] = chan;
-	test[NUMCOL - 2] = 1;
+	test[4] = 0;
+	test[5] = 0;
+	test[6] = 0;
+	test[7] = 0;
+	test[8] = chan;
+	test[NUMCOL - 2] = 1; // because thersh is between (in test[9]) the flag and roi
 }
