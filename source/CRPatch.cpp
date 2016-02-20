@@ -14,7 +14,8 @@ using namespace std;
 void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n, int label, CvRect* box, std::vector<CvPoint>* vCenter) {
 	// extract features
 	vector<IplImage*> vImg;
-	extractFeatureChannelsExtra(img, vImg,fullpath);
+	//extractFeatureChannelsExtra(img, vImg,fullpath);
+	extractPCAChannels(img, vImg, fullpath);
 	
 	CvMat tmp;
 	int offx = width / 2;
@@ -66,7 +67,8 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 void CRPatch::extractPatchesMul(IplImage *img, const char* fullpath, unsigned int n, int label, std::vector<CvRect>& box, int startpos,int endpos) {
 	// extract features
 	vector<IplImage*> vImg;
-	extractFeatureChannelsExtra(img, vImg, fullpath);
+	//extractFeatureChannelsExtra(img, vImg, fullpath);
+	extractPCAChannels(img, vImg, fullpath);
 
 	CvMat tmp;
 	int offx = width / 2;
@@ -388,6 +390,63 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 
 	//max filter
 	for (int c = 0; c<18; ++c)
+		maxfilt(vImg[c], 5);
+
+
+
+#if 0
+	// for debugging only
+	char buffer[40];
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "out-%d.png", i);
+		cvNamedWindow(buffer, 1);
+		cvShowImage(buffer, vImg[i]);
+		//cvSaveImage( buffer, vImg[i] );
+	}
+
+	cvWaitKey();
+
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "%d", i);
+		cvDestroyWindow(buffer);
+	}
+#endif
+
+
+}
+
+void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath) {
+	// 4 feature channels
+	// 0 channels: L, a, b, |I_x|, |I_y|, |I_xx|, |I_yy|, HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
+	// 2 channels : PCAm PCAs
+	// 2+2 channels: minfilter + maxfilter on 5x5 neighborhood 
+
+	vImg.resize(4);
+	for (unsigned int c = 0; c<vImg.size(); ++c)
+		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
+
+	// Get PCAm and PCAs Channel from saved images
+	string delimiter = ".";
+	string s = fullpath;
+	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+	size_t found = token.find_last_of("/\\");
+	string fname = token.substr(found + 1);//filename
+	string path = token.substr(0, found); //full path of image without filename
+	string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
+	string rootpath = path.substr(0, path.find_last_of("/\\'"));
+	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
+	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
+	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+
+	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+
+	// min filter
+	for (int c = 0; c<2; ++c)
+		minfilt(vImg[c], vImg[c + 2], 5);
+
+	//max filter
+	for (int c = 0; c<2; ++c)
 		maxfilt(vImg[c], 5);
 
 

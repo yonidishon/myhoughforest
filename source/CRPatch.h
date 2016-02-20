@@ -76,6 +76,7 @@ public:
 	static void extractFeatureChannelsPartial(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
 	// Extract features from image ( All Houghforest - and adding my PCAs and PCAm)
 	static void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
+	static void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
 	// min/max filter
 	static void maxfilt(uchar* data, uchar* maxvalues, unsigned int step, unsigned int size, unsigned int width);
 	static void maxfilt(uchar* data, unsigned int step, unsigned int size, unsigned int width);

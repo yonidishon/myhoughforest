@@ -15,7 +15,8 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 	// extract features
 	vector<IplImage*> vImg;
 	//CRPatch::extractFeatureChannels(img, vImg);
-	CRPatch::extractFeatureChannelsExtra(img, vImg, imfile); //vImg are features map size(Img)
+	//CRPatch::extractFeatureChannelsExtra(img, vImg, imfile); //vImg are features map size(Img)
+	CRPatch::extractPCAChannels(img, vImg, imfile); //vImg are features map size(Img)
 
 	// reset output image
 	for(int c=0; c<(int)imgDetect.size(); ++c)
@@ -61,7 +62,7 @@ void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect,
 				// To speed up the voting, one can vote only for patches 
 			        // with a probability for foreground > 0.5
 			        // 
-				if((*itL)->pfg>=1) {
+				if((*itL)->pfg>=0.8) {
 
 					// voting weight for leaf 
 					float w = (*itL)->pfg / float( (*itL)->vCenter.size() * result.size() );
