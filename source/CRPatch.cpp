@@ -5,6 +5,9 @@
 
 #include "CRPatch.h"
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/core/core.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d/features2d.hpp>
 //#include <stdio.h>
 //#include <stdlib.h>
 #include <deque>
@@ -447,6 +450,77 @@ void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, co
 
 	//max filter
 	for (int c = 0; c<2; ++c)
+		maxfilt(vImg[c], 5);
+
+
+
+#if 0
+	// for debugging only
+	char buffer[40];
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "out-%d.png", i);
+		cvNamedWindow(buffer, 1);
+		cvShowImage(buffer, vImg[i]);
+		//cvSaveImage( buffer, vImg[i] );
+	}
+
+	cvWaitKey();
+
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "%d", i);
+		cvDestroyWindow(buffer);
+	}
+#endif
+
+
+}
+
+void CRPatch::extractPCAChannelsPlusEst(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath) {
+	// 6 feature channels
+	// 0 channels: L, a, b, |I_x|, |I_y|, |I_xx|, |I_yy|, HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
+	// 2 channels : PCAm PCAs
+	// 1 channel : GT(t-1) || Gaussian in middle frame in training and Estimation of frame(t-1) || Gaussian in middle frame in testing
+	// 2+1+2+1 channels: minfilter + maxfilter on 5x5 neighborhood 
+
+	vImg.resize(6);
+	for (unsigned int c = 0; c<vImg.size(); ++c)
+		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
+
+	// Get PCAm and PCAs Channel from saved images
+	string delimiter = ".";
+	string s = fullpath;
+	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+	size_t found = token.find_last_of("/\\");
+	string fname = token.substr(found + 1);//filename
+	string path = token.substr(0, found); //full path of image without filename
+	string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
+	string rootpath = path.substr(0, path.find_last_of("/\\'"));
+	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
+	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
+	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+	// PCA channels
+	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	// GT channel
+	std::string::size_type sz;   // alias of size_t
+	int i_dec = std::stoi(fname, &sz);
+	char buffer[7];
+
+	if(i_dec > 1) // frames are starting at number 1 and format is  %06i
+	{
+		string fullpathGT = rootpath + "DIEMFIXATIONpng/\\" + pfolder + "/\\" + sprintf(buffer,'%06i',i_dec-1) + "_predMap.png";
+		vImg[2] = cvLoadImage(fullpathGT.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	}
+	else // 1st file no ground truth of previous need to put Gaussian in the middle
+	{
+		vImg[2] = GaussianBlur(vImg[2], vImg[2], Size ksize, double sigmaX, double sigmaY = 0, int borderType = BORDER_DEFAULT)
+	}
+	// min filter
+	for (int c = 0; c<3; ++c)
+		minfilt(vImg[c], vImg[c + 3], 5);
+
+	//max filter
+	for (int c = 0; c<3; ++c)
 		maxfilt(vImg[c], 5);
 
 
@@ -976,4 +1050,39 @@ void CRPatch::maxminfilt(uchar* data, uchar* maxvalues, uchar* minvalues, unsign
     maxvalues[size-d] = data[maxfifo.size()>0 ? maxfifo.front():size-step];
 	minvalues[size-d] = data[minfifo.size()>0 ? minfifo.front():size-step];
  
+}
+
+cv::Mat CRPatch::fixMat2GMM(cv::Mat& nmsmat, cv::Mat& img, int sigma = 15){
+	cv::Mat locations;   // output, locations of non-zero pixels 
+	findNonZero(nmsmat, locations);
+	vector<int> pnts;
+	vector<CvPoint> ps;
+	for (int i = 0; i < locations.rows; i++){
+		ps.push_back(locations.at<Point>(i));
+		pnts.push_back(img.at<uchar>(ps[i].y, ps[i].x));
+	}
+	cv::Mat1i X, Y;
+	meshgridTest(Range(0, nmsmat.cols), Range(0, nmsmat.rows), X, Y);
+	cv::Mat GMM(nmsmat.rows, nmsmat.cols, CV_64F, Scalar::all(0));
+	for (int i = 0; i < ps.size(); i++){
+		Mat fg(nmsmat.rows, nmsmat.cols, CV_64F);
+		for (int j = 0; j < nmsmat.rows; j++){
+			for (int k = 0; k < nmsmat.cols; k++){
+				fg.at<double>(j, k) = exp(-((double(pow((Y.at<int>(j, k) - ps[i].y), 2)) / 2 / pow(sigma, 2)) + (double(pow((X.at<int>(j, k) - ps[i].x), 2)) / 2 / pow(sigma, 2))));
+			}
+		}
+		double mymin, mymax;
+		minMaxLoc(fg, &mymin, &mymax);
+		if (mymax != 0){
+			fg = (pnts[i] * fg) / mymax;
+			GMM = GMM + fg;
+		}
+
+	}
+	double mymin, mymax;
+	minMaxLoc(GMM, &mymin, &mymax);
+	if (mymax != 0){
+		GMM = GMM / mymax;
+	}
+	return GMM;
 }

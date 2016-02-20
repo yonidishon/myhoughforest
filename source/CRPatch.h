@@ -77,6 +77,7 @@ public:
 	// Extract features from image ( All Houghforest - and adding my PCAs and PCAm)
 	static void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
 	static void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
+	static void CRPatch::extractPCAChannelsPlusEst(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
 	// min/max filter
 	static void maxfilt(uchar* data, uchar* maxvalues, unsigned int step, unsigned int size, unsigned int width);
 	static void maxfilt(uchar* data, unsigned int step, unsigned int size, unsigned int width);
@@ -87,6 +88,8 @@ public:
 	static void maxfilt(IplImage *src, IplImage *dst, unsigned int width);
 	static void minfilt(IplImage *src, unsigned int width);
 	static void minfilt(IplImage *src, IplImage *dst, unsigned int width);
+	//Helper functions
+	cv::Mat fixMat2GMM(cv::Mat& nmsmat, cv::Mat& img, int sigma = 15);
 
 	std::vector<std::vector<PatchFeature> > vLPatches;
 private:
