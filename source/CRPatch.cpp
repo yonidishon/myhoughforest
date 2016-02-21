@@ -5,9 +5,9 @@
 
 #include "CRPatch.h"
 #include <opencv2/highgui/highgui.hpp>
-#include <opencv2/core/core.hpp>
+//#include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/features2d/features2d.hpp>
+//#include <opencv2/features2d/features2d.hpp>
 //#include <stdio.h>
 //#include <stdlib.h>
 #include <deque>
@@ -18,7 +18,7 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 	// extract features
 	vector<IplImage*> vImg;
 	//extractFeatureChannelsExtra(img, vImg,fullpath);
-	extractPCAChannels(img, vImg, fullpath);
+	extractPCAChannelsPlusEst(img, vImg, fullpath);
 	
 	CvMat tmp;
 	int offx = width / 2;
@@ -71,7 +71,7 @@ void CRPatch::extractPatchesMul(IplImage *img, const char* fullpath, unsigned in
 	// extract features
 	vector<IplImage*> vImg;
 	//extractFeatureChannelsExtra(img, vImg, fullpath);
-	extractPCAChannels(img, vImg, fullpath);
+	extractPCAChannelsPlusEst(img, vImg, fullpath);
 
 	CvMat tmp;
 	int offx = width / 2;
@@ -506,14 +506,27 @@ void CRPatch::extractPCAChannelsPlusEst(IplImage *img, std::vector<IplImage*>& v
 	int i_dec = std::stoi(fname, &sz);
 	char buffer[7];
 
-	if(i_dec > 1) // frames are starting at number 1 and format is  %06i
+	if(i_dec < 1) // frames are starting at number 1 and format is  %06i
 	{
-		string fullpathGT = rootpath + "DIEMFIXATIONpng/\\" + pfolder + "/\\" + sprintf(buffer,'%06i',i_dec-1) + "_predMap.png";
+		sprintf(buffer, "%06d", i_dec - 1);
+		string fullpathGT = rootpath + "/\\" + "DIEMFIXATIONpng/\\" + pfolder + "/\\" + buffer + "_predMap.png";
 		vImg[2] = cvLoadImage(fullpathGT.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 	}
 	else // 1st file no ground truth of previous need to put Gaussian in the middle
 	{
-		vImg[2] = GaussianBlur(vImg[2], vImg[2], Size ksize, double sigmaX, double sigmaY = 0, int borderType = BORDER_DEFAULT)
+		cv::Mat fixmat(img->width, img->height, CV_64F, cv::Scalar::all(0));
+		if (img->width % 2 && img->height % 2)
+		{
+			fixmat.at<double>(img->width / 2, img->height / 2) = 1;
+		}
+		else
+		{
+			cv::Rect r(floor (img->width / 2), floor(img->height / 2), ceil(img->width / 2), ceil(img->height / 2));
+			cv::Mat roi(fixmat, r);
+			roi = cv::Scalar(1);
+		}
+		cv::Mat tmp(img->width, img->height, CV_64F, cv::Scalar::all(0));
+		vImg[2] = new IplImage(fixMat2GMM(fixmat, tmp));
 	}
 	// min filter
 	for (int c = 0; c<3; ++c)
@@ -1052,27 +1065,42 @@ void CRPatch::maxminfilt(uchar* data, uchar* maxvalues, uchar* minvalues, unsign
  
 }
 
-cv::Mat CRPatch::fixMat2GMM(cv::Mat& nmsmat, cv::Mat& img, int sigma = 15){
+// helper function (maybe that goes somehow easier)
+void CRPatch::meshgrid(const cv::Mat &xgv, const cv::Mat &ygv, cv::Mat1i &X, cv::Mat1i &Y)
+{
+	repeat(xgv.reshape(1, 1), ygv.total(), 1, X);
+	repeat(ygv.reshape(1, 1).t(), 1, xgv.total(), Y);
+}
+
+void CRPatch::meshgridTest(const cv::Range &xgv, const cv::Range &ygv, cv::Mat1i &X, cv::Mat1i &Y)
+{
+	vector<int> t_x, t_y;
+	for (int i = xgv.start; i < xgv.end; i++) t_x.push_back(i);
+	for (int i = ygv.start; i < ygv.end; i++) t_y.push_back(i);
+	meshgrid(cv::Mat(t_x), cv::Mat(t_y), X, Y);
+}
+
+cv::Mat CRPatch::fixMat2GMM(cv::Mat& nmsmat, cv::Mat& img, int sigma){
 	cv::Mat locations;   // output, locations of non-zero pixels 
 	findNonZero(nmsmat, locations);
 	vector<int> pnts;
 	vector<CvPoint> ps;
 	for (int i = 0; i < locations.rows; i++){
-		ps.push_back(locations.at<Point>(i));
+		ps.push_back(locations.at<cv::Point>(i));
 		pnts.push_back(img.at<uchar>(ps[i].y, ps[i].x));
 	}
 	cv::Mat1i X, Y;
-	meshgridTest(Range(0, nmsmat.cols), Range(0, nmsmat.rows), X, Y);
-	cv::Mat GMM(nmsmat.rows, nmsmat.cols, CV_64F, Scalar::all(0));
+	meshgridTest(cv::Range(0, nmsmat.cols), cv::Range(0, nmsmat.rows), X, Y);
+	cv::Mat GMM(nmsmat.rows, nmsmat.cols, CV_64F, cv::Scalar::all(0));
 	for (int i = 0; i < ps.size(); i++){
-		Mat fg(nmsmat.rows, nmsmat.cols, CV_64F);
+		cv::Mat fg(nmsmat.rows, nmsmat.cols, CV_64F);
 		for (int j = 0; j < nmsmat.rows; j++){
 			for (int k = 0; k < nmsmat.cols; k++){
 				fg.at<double>(j, k) = exp(-((double(pow((Y.at<int>(j, k) - ps[i].y), 2)) / 2 / pow(sigma, 2)) + (double(pow((X.at<int>(j, k) - ps[i].x), 2)) / 2 / pow(sigma, 2))));
 			}
 		}
 		double mymin, mymax;
-		minMaxLoc(fg, &mymin, &mymax);
+		cv::minMaxLoc(fg, &mymin, &mymax);
 		if (mymax != 0){
 			fg = (pnts[i] * fg) / mymax;
 			GMM = GMM + fg;
@@ -1080,7 +1108,7 @@ cv::Mat CRPatch::fixMat2GMM(cv::Mat& nmsmat, cv::Mat& img, int sigma = 15){
 
 	}
 	double mymin, mymax;
-	minMaxLoc(GMM, &mymin, &mymax);
+	cv::minMaxLoc(GMM, &mymin, &mymax);
 	if (mymax != 0){
 		GMM = GMM / mymax;
 	}

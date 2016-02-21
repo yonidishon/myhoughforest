@@ -89,7 +89,9 @@ public:
 	static void minfilt(IplImage *src, unsigned int width);
 	static void minfilt(IplImage *src, IplImage *dst, unsigned int width);
 	//Helper functions
-	cv::Mat fixMat2GMM(cv::Mat& nmsmat, cv::Mat& img, int sigma = 15);
+	static void meshgrid(const cv::Mat &xgv, const cv::Mat &ygv, cv::Mat1i &X, cv::Mat1i &Y);
+	static void meshgridTest(const cv::Range &xgv, const cv::Range &ygv, cv::Mat1i &X, cv::Mat1i &Y);
+	cv::Mat static fixMat2GMM(cv::Mat& nmsmat, cv::Mat& img, int sigma = 15);
 
 	std::vector<std::vector<PatchFeature> > vLPatches;
 private:
