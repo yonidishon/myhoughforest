@@ -506,7 +506,7 @@ void CRPatch::extractPCAChannelsPlusEst(IplImage *img, std::vector<IplImage*>& v
 	int i_dec = std::stoi(fname, &sz);
 	char buffer[7];
 
-	if(i_dec < 1) // frames are starting at number 1 and format is  %06i
+	if(i_dec > 1) // frames are starting at number 1 and format is  %06i
 	{
 		sprintf(buffer, "%06d", i_dec - 1);
 		string fullpathGT = rootpath + "/\\" + "DIEMFIXATIONpng/\\" + pfolder + "/\\" + buffer + "_predMap.png";
@@ -514,19 +514,18 @@ void CRPatch::extractPCAChannelsPlusEst(IplImage *img, std::vector<IplImage*>& v
 	}
 	else // 1st file no ground truth of previous need to put Gaussian in the middle
 	{
-		cv::Mat fixmat(img->width, img->height, CV_64F, cv::Scalar::all(0));
+		cv::Mat fixmat(img->height, img->width, CV_64F, cv::Scalar::all(0));
 		if (img->width % 2 && img->height % 2)
 		{
-			fixmat.at<double>(img->width / 2, img->height / 2) = 1;
+			fixmat.at<double>(ceil(img->width / 2),ceil( img->height / 2)) = 1;
 		}
 		else
 		{
-			cv::Rect r(floor (img->width / 2), floor(img->height / 2), ceil(img->width / 2), ceil(img->height / 2));
+			cv::Rect r(img->width / 2 -1, img->height / 2-1, 2, 2);
 			cv::Mat roi(fixmat, r);
-			roi = cv::Scalar(1);
+			roi = 1;
 		}
-		cv::Mat tmp(img->width, img->height, CV_64F, cv::Scalar::all(0));
-		vImg[2] = new IplImage(fixMat2GMM(fixmat, tmp));
+		vImg[2] = new IplImage(fixMat2GMM(fixmat));
 	}
 	// min filter
 	for (int c = 0; c<3; ++c)
@@ -1080,14 +1079,14 @@ void CRPatch::meshgridTest(const cv::Range &xgv, const cv::Range &ygv, cv::Mat1i
 	meshgrid(cv::Mat(t_x), cv::Mat(t_y), X, Y);
 }
 
-cv::Mat CRPatch::fixMat2GMM(cv::Mat& nmsmat, cv::Mat& img, int sigma){
+cv::Mat CRPatch::fixMat2GMM(cv::Mat& nmsmat, int sigma){
 	cv::Mat locations;   // output, locations of non-zero pixels 
-	findNonZero(nmsmat, locations);
+	findNonZero(nmsmat>0, locations);
 	vector<int> pnts;
 	vector<CvPoint> ps;
 	for (int i = 0; i < locations.rows; i++){
 		ps.push_back(locations.at<cv::Point>(i));
-		pnts.push_back(img.at<uchar>(ps[i].y, ps[i].x));
+		pnts.push_back(nmsmat.at<double>(ps[i].y, ps[i].x));
 	}
 	cv::Mat1i X, Y;
 	meshgridTest(cv::Range(0, nmsmat.cols), cv::Range(0, nmsmat.rows), X, Y);
