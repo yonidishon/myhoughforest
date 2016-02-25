@@ -78,6 +78,7 @@ public:
 	static void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
 	static void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
 	static void CRPatch::extractPCAChannelsPlusEst(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
+	static void CRPatch::extractPCAChannelsPlusEstTest(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath, const char* exp_fold);
 	// min/max filter
 	static void maxfilt(uchar* data, uchar* maxvalues, unsigned int step, unsigned int size, unsigned int width);
 	static void maxfilt(uchar* data, unsigned int step, unsigned int size, unsigned int width);

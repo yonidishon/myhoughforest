@@ -558,6 +558,91 @@ void CRPatch::extractPCAChannelsPlusEst(IplImage *img, std::vector<IplImage*>& v
 
 }
 
+void CRPatch::extractPCAChannelsPlusEstTest(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath, const char* exp_fold) {
+	// 6 feature channels
+	// 0 channels: L, a, b, |I_x|, |I_y|, |I_xx|, |I_yy|, HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
+	// 2 channels : PCAm PCAs
+	// 1 channel : Estimation(t-1) || Gaussian in middle frame in training and Estimation of frame(t-1) || Gaussian in middle frame in testing
+	// 2+1+2+1 channels: minfilter + maxfilter on 5x5 neighborhood 
+
+	vImg.resize(6);
+	for (unsigned int c = 0; c<vImg.size(); ++c)
+		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
+
+	// Get PCAm and PCAs Channel from saved images
+	string delimiter = ".";
+	string s = fullpath;
+	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
+	size_t found = token.find_last_of("/\\");
+	string fname = token.substr(found + 1);//filename
+	string path = token.substr(0, found); //full path of image without filename
+	string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
+	string rootpath = path.substr(0, path.find_last_of("/\\'"));
+	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
+	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
+	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+	// PCA channels
+	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	// GT channel
+	std::string::size_type sz;   // alias of size_t
+	int i_dec = std::stoi(fname, &sz);
+	char buffer[7];
+
+	if (i_dec > 1) // frames are starting at number 1 and format is  %06i
+	{
+		sprintf(buffer, "%06d", i_dec - 1);
+		// find previous prediction and use it.
+		string exp = exp_fold;
+		string fullpathGT = exp + "/\\" + pfolder + "/\\" + buffer + "_sc0_c0_predmap.png";
+		vImg[2] = cvLoadImage(fullpathGT.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
+	}
+	else // 1st file no ground truth of previous need to put Gaussian in the middle
+	{
+		cv::Mat fixmat(img->height, img->width, CV_64F, cv::Scalar::all(0));
+		if (img->width % 2 && img->height % 2)
+		{
+			fixmat.at<double>(ceil(img->width / 2), ceil(img->height / 2)) = 1;
+		}
+		else
+		{
+			cv::Rect r(img->width / 2 - 1, img->height / 2 - 1, 2, 2);
+			cv::Mat roi(fixmat, r);
+			roi = 1;
+		}
+		vImg[2] = new IplImage(fixMat2GMM(fixmat));
+	}
+	// min filter
+	for (int c = 0; c<3; ++c)
+		minfilt(vImg[c], vImg[c + 3], 5);
+
+	//max filter
+	for (int c = 0; c<3; ++c)
+		maxfilt(vImg[c], 5);
+
+
+
+#if 0
+	// for debugging only
+	char buffer[40];
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "out-%d.png", i);
+		cvNamedWindow(buffer, 1);
+		cvShowImage(buffer, vImg[i]);
+		//cvSaveImage( buffer, vImg[i] );
+	}
+
+	cvWaitKey();
+
+	for (unsigned int i = 0; i<vImg.size(); ++i) {
+		sprintf_s(buffer, "%d", i);
+		cvDestroyWindow(buffer);
+	}
+#endif
+
+
+}
+
 void CRPatch::extractFeatureChannelsPartial(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath ) {
 	// 18 feature channels + 4 features (PCAs , PCAm)x2
 	// 9 channels: HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)

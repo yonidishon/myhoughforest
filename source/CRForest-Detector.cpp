@@ -544,19 +544,20 @@ void detect(CRForestDetector& crDetect) {
 				vImgDetect[k][c] = cvCreateImage( cvSize(int(img->width*scales[k]+0.5),int(img->height*scales[k]+0.5)), IPL_DEPTH_32F, 1 );
 			}
 		}
-
-		// Detection for all scales
-		crDetect.detectPyramid(img, vImgDetect, ratios, vFilenames[i].c_str());
-
-		// Store result
+		//prepare path
 		string delimiter = ".";
-		string s = vFilenames[i].c_str(); 
+		string s = vFilenames[i].c_str();
 		string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
 		size_t found = token.find_last_of("/\\");
 		string fname = token.substr(found + 1);//filename
-		string path = token.substr(0,found); //full path of image without filename
+		string path = token.substr(0, found); //full path of image without filename
 		string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
 		string curfolder = outpath + "\\" + pfolder; //store path for detection
+
+		// Detection for all scales
+		crDetect.detectPyramid(img, vImgDetect, ratios, vFilenames[i].c_str(), curfolder.c_str());
+
+		// Store result
 		// Check if folder for result is exist and create if not
 		if (!DirectoryExists(curfolder.c_str())){
 			string execstr1 = "mkdir ";
