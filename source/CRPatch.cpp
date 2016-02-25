@@ -594,7 +594,7 @@ void CRPatch::extractPCAChannelsPlusEstTest(IplImage *img, std::vector<IplImage*
 		sprintf(buffer, "%06d", i_dec - 1);
 		// find previous prediction and use it.
 		string exp = exp_fold;
-		string fullpathGT = exp + "/\\" + pfolder + "/\\" + buffer + "_sc0_c0_predmap.png";
+		string fullpathGT = exp + "/\\" + buffer + "_sc0_c0_predmap.png";
 		vImg[2] = cvLoadImage(fullpathGT.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 	}
 	else // 1st file no ground truth of previous need to put Gaussian in the middle
@@ -610,7 +610,11 @@ void CRPatch::extractPCAChannelsPlusEstTest(IplImage *img, std::vector<IplImage*
 			cv::Mat roi(fixmat, r);
 			roi = 1;
 		}
-		vImg[2] = new IplImage(fixMat2GMM(fixmat));
+		cv::Mat tmp = fixMat2GMM(fixmat);
+		cv::Mat tmp1;
+		tmp.convertTo(tmp1, CV_8U,255);
+
+		vImg[2] = cvCloneImage(&(IplImage)tmp);
 	}
 	// min filter
 	for (int c = 0; c<3; ++c)
@@ -1175,12 +1179,12 @@ cv::Mat CRPatch::fixMat2GMM(cv::Mat& nmsmat, int sigma){
 	}
 	cv::Mat1i X, Y;
 	meshgridTest(cv::Range(0, nmsmat.cols), cv::Range(0, nmsmat.rows), X, Y);
-	cv::Mat GMM(nmsmat.rows, nmsmat.cols, CV_64F, cv::Scalar::all(0));
+	cv::Mat GMM(nmsmat.rows, nmsmat.cols, CV_32F, cv::Scalar::all(0));
 	for (int i = 0; i < ps.size(); i++){
-		cv::Mat fg(nmsmat.rows, nmsmat.cols, CV_64F);
+		cv::Mat fg(nmsmat.rows, nmsmat.cols, CV_32F);
 		for (int j = 0; j < nmsmat.rows; j++){
 			for (int k = 0; k < nmsmat.cols; k++){
-				fg.at<double>(j, k) = exp(-((double(pow((Y.at<int>(j, k) - ps[i].y), 2)) / 2 / pow(sigma, 2)) + (double(pow((X.at<int>(j, k) - ps[i].x), 2)) / 2 / pow(sigma, 2))));
+				fg.at<float>(j, k) = exp(-((float(pow((Y.at<int>(j, k) - ps[i].y), 2)) / 2 / pow(sigma, 2)) + (float(pow((X.at<int>(j, k) - ps[i].x), 2)) / 2 / pow(sigma, 2))));
 			}
 		}
 		double mymin, mymax;
