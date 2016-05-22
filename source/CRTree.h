@@ -75,6 +75,7 @@ private:
 	bool optimizeTest(std::vector<std::vector<const PatchFeature*> >& SetA, std::vector<std::vector<const PatchFeature*> >& SetB, const std::vector<std::vector<const PatchFeature*> >& TrainSet, int* test, unsigned int iter, unsigned int mode);
 	void generateTest(int* test, unsigned int max_w, unsigned int max_h, unsigned int max_c);
 	void generateTestAve(int* test, unsigned int max_w, unsigned int max_h, int chan);
+	void generateTestVar(int* test, unsigned int max_w, unsigned int max_h, int chan);
 	void evaluateTest(std::vector<std::vector<IntIndex> >& valSet, const int* test, const std::vector<std::vector<const PatchFeature*> >& TrainSet);
 	void split(std::vector<std::vector<const PatchFeature*> >& SetA, std::vector<std::vector<const PatchFeature*> >& SetB, const std::vector<std::vector<const PatchFeature*> >& TrainSet, const std::vector<std::vector<IntIndex> >& valSet, int t);
 	double measureSet(const std::vector<std::vector<const PatchFeature*> >& SetA, const std::vector<std::vector<const PatchFeature*> >& SetB, unsigned int mode) {
@@ -227,4 +228,20 @@ inline void CRTree::generateTestAve(int* test, unsigned int max_w, unsigned int 
 	test[7] = 0;
 	test[8] = chan;
 	test[NUMCOL - 2] = 1; // because thersh is between (in test[9]) the flag and roi
+}
+inline void CRTree::generateTestVar(int* test, unsigned int max_w, unsigned int max_h, int chan) {
+	//return value is int array of zize[5] [p1(x,y),p2(x,y),channel]
+	// subpatches test pnode = [leafindex xa1 ya1 xb1 yb2 xa2 ya2 xb2 yb2 channel thres testflag]
+	//						  [ 	0	  1	  2   3   4   5   6   7   8     9      10     11   ]
+	// test has no leafindex and no test flag
+	test[0] = 0;
+	test[1] = 0;
+	test[2] = max_w - 1;
+	test[3] = max_h - 1;
+	test[4] = 0;
+	test[5] = 0;
+	test[6] = 0;
+	test[7] = 0;
+	test[8] = chan;
+	test[NUMCOL - 2] = 2; // because thersh is between (in test[9]) the flag and roi
 }

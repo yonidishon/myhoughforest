@@ -260,6 +260,9 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 		if (i < TrainSet[1][0]->vPatch.size()){ //first we choose test of patch mean - FOR ALL CHANNEL 
 			generateTestAve(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, i);
 		}
+		else if (i >= TrainSet[1][0]->vPatch.size() && i < 2*(TrainSet[1][0]->vPatch.size())){ //first we choose test of patch mean - FOR ALL CHANNEL 
+			generateTestVar(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, i);
+		}
 		else{ 
 			generateTest(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, TrainSet[1][0]->vPatch.size());
 		};
@@ -339,6 +342,29 @@ void CRTree::evaluateTest(std::vector<std::vector<IntIndex> >& valSet, const int
 						}
 						valSet[l][i].val = patchSum /(double) numel;
 						break;
+			}
+			case 2:{//patch var
+					   int patchSum = 0;
+					   int numel = 0;
+					   //calc Mean of patch
+					   for (int y = test[1]; y < test[3] + 1; y++){
+						   for (int x = test[0]; x < test[2] + 1; x++){
+							   patchSum += (int)*(uchar*)cvPtr2D(ptC, y, x);
+							   numel++;
+						   }
+					   }
+					   double pMean = patchSum / (double)numel;
+					   double varSum = 0;
+					   double sqr = 0;
+					   for (int y = test[1]; y < test[3] + 1; y++){
+						   for (int x = test[0]; x < test[2] + 1; x++){
+							   sqr = ((int)*(uchar*)cvPtr2D(ptC, y, x) - pMean);
+							   varSum += pow(sqr, sqr);
+						   }
+					   }
+					   valSet[l][i].val = varSum / (double)numel;
+					   break;
+
 			}
 			default: { // subpatches test
 						 // subpatches test pnode = [leafindex xa1 ya1 xb1 yb2 xa2 ya2 xb2 yb2 channel thres testflag]
