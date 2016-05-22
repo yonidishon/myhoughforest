@@ -5,9 +5,6 @@
 
 #include "CRPatch.h"
 #include <opencv2/highgui/highgui.hpp>
-//#include <opencv2/core/core.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-//#include <opencv2/features2d/features2d.hpp>
 //#include <stdio.h>
 //#include <stdlib.h>
 #include <deque>
@@ -18,7 +15,7 @@ void CRPatch::extractPatches(IplImage *img,const char* fullpath, unsigned int n,
 	// extract features
 	vector<IplImage*> vImg;
 	//extractFeatureChannelsExtra(img, vImg,fullpath);
-	extractPCAChannelsPlusEst(img, vImg, fullpath);
+	extractPCAChannels(img, vImg, fullpath);
 	
 	CvMat tmp;
 	int offx = width / 2;
@@ -71,7 +68,7 @@ void CRPatch::extractPatchesMul(IplImage *img, const char* fullpath, unsigned in
 	// extract features
 	vector<IplImage*> vImg;
 	//extractFeatureChannelsExtra(img, vImg, fullpath);
-	extractPCAChannelsPlusEst(img, vImg, fullpath);
+	extractPCAChannels(img, vImg, fullpath);
 
 	CvMat tmp;
 	int offx = width / 2;
@@ -450,178 +447,6 @@ void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, co
 
 	//max filter
 	for (int c = 0; c<2; ++c)
-		maxfilt(vImg[c], 5);
-
-
-
-#if 0
-	// for debugging only
-	char buffer[40];
-	for (unsigned int i = 0; i<vImg.size(); ++i) {
-		sprintf_s(buffer, "out-%d.png", i);
-		cvNamedWindow(buffer, 1);
-		cvShowImage(buffer, vImg[i]);
-		//cvSaveImage( buffer, vImg[i] );
-	}
-
-	cvWaitKey();
-
-	for (unsigned int i = 0; i<vImg.size(); ++i) {
-		sprintf_s(buffer, "%d", i);
-		cvDestroyWindow(buffer);
-	}
-#endif
-
-
-}
-
-void CRPatch::extractPCAChannelsPlusEst(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath) {
-	// 6 feature channels
-	// 0 channels: L, a, b, |I_x|, |I_y|, |I_xx|, |I_yy|, HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
-	// 2 channels : PCAm PCAs
-	// 1 channel : GT(t-1) || Gaussian in middle frame in training and Estimation of frame(t-1) || Gaussian in middle frame in testing
-	// 2+1+2+1 channels: minfilter + maxfilter on 5x5 neighborhood 
-
-	vImg.resize(6);
-	for (unsigned int c = 0; c<vImg.size(); ++c)
-		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
-
-	// Get PCAm and PCAs Channel from saved images
-	string delimiter = ".";
-	string s = fullpath;
-	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
-	size_t found = token.find_last_of("/\\");
-	string fname = token.substr(found + 1);//filename
-	string path = token.substr(0, found); //full path of image without filename
-	string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
-	string rootpath = path.substr(0, path.find_last_of("/\\'"));
-	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
-	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
-	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
-	// PCA channels
-	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-	// GT channel
-	std::string::size_type sz;   // alias of size_t
-	int i_dec = std::stoi(fname, &sz);
-	char buffer[7];
-
-	if(i_dec > 1) // frames are starting at number 1 and format is  %06i
-	{
-		sprintf(buffer, "%06d", i_dec - 1);
-		string fullpathGT = rootpath + "/\\" + "DIEMFIXATIONpng/\\" + pfolder + "/\\" + buffer + "_predMap.png";
-		vImg[2] = cvLoadImage(fullpathGT.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-	}
-	else // 1st file no ground truth of previous need to put Gaussian in the middle
-	{
-		cv::Mat fixmat(img->height, img->width, CV_64F, cv::Scalar::all(0));
-		if (img->width % 2 && img->height % 2)
-		{
-			fixmat.at<double>(ceil(img->width / 2),ceil( img->height / 2)) = 1;
-		}
-		else
-		{
-			cv::Rect r(img->width / 2 -1, img->height / 2-1, 2, 2);
-			cv::Mat roi(fixmat, r);
-			roi = 1;
-		}
-		vImg[2] = new IplImage(fixMat2GMM(fixmat));
-	}
-	// min filter
-	for (int c = 0; c<3; ++c)
-		minfilt(vImg[c], vImg[c + 3], 5);
-
-	//max filter
-	for (int c = 0; c<3; ++c)
-		maxfilt(vImg[c], 5);
-
-
-
-#if 0
-	// for debugging only
-	char buffer[40];
-	for (unsigned int i = 0; i<vImg.size(); ++i) {
-		sprintf_s(buffer, "out-%d.png", i);
-		cvNamedWindow(buffer, 1);
-		cvShowImage(buffer, vImg[i]);
-		//cvSaveImage( buffer, vImg[i] );
-	}
-
-	cvWaitKey();
-
-	for (unsigned int i = 0; i<vImg.size(); ++i) {
-		sprintf_s(buffer, "%d", i);
-		cvDestroyWindow(buffer);
-	}
-#endif
-
-
-}
-
-void CRPatch::extractPCAChannelsPlusEstTest(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath, const char* exp_fold) {
-	// 6 feature channels
-	// 0 channels: L, a, b, |I_x|, |I_y|, |I_xx|, |I_yy|, HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
-	// 2 channels : PCAm PCAs
-	// 1 channel : Estimation(t-1) || Gaussian in middle frame in training and Estimation of frame(t-1) || Gaussian in middle frame in testing
-	// 2+1+2+1 channels: minfilter + maxfilter on 5x5 neighborhood 
-
-	vImg.resize(6);
-	for (unsigned int c = 0; c<vImg.size(); ++c)
-		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
-
-	// Get PCAm and PCAs Channel from saved images
-	string delimiter = ".";
-	string s = fullpath;
-	string token = s.substr(0, s.find(delimiter)); //fullpath without file extention
-	size_t found = token.find_last_of("/\\");
-	string fname = token.substr(found + 1);//filename
-	string path = token.substr(0, found); //full path of image without filename
-	string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
-	string rootpath = path.substr(0, path.find_last_of("/\\'"));
-	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
-	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
-	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
-	// PCA channels
-	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-	// GT channel
-	std::string::size_type sz;   // alias of size_t
-	int i_dec = std::stoi(fname, &sz);
-	char buffer[7];
-
-	if (i_dec > 1) // frames are starting at number 1 and format is  %06i
-	{
-		sprintf(buffer, "%06d", i_dec - 1);
-		// find previous prediction and use it.
-		string exp = exp_fold;
-		string fullpathGT = exp + "/\\" + buffer + "_sc0_c0_predmap.png";
-		vImg[2] = cvLoadImage(fullpathGT.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-	}
-	else // 1st file no ground truth of previous need to put Gaussian in the middle
-	{
-		cv::Mat fixmat(img->height, img->width, CV_64F, cv::Scalar::all(0));
-		if (img->width % 2 && img->height % 2)
-		{
-			fixmat.at<double>(ceil(img->width / 2), ceil(img->height / 2)) = 1;
-		}
-		else
-		{
-			cv::Rect r(img->width / 2 - 1, img->height / 2 - 1, 2, 2);
-			cv::Mat roi(fixmat, r);
-			roi = 1;
-		}
-		cv::Mat tmp = fixMat2GMM(fixmat);
-		cv::Mat tmp1;
-		tmp.convertTo(tmp1, CV_8U,255);
-
-		vImg[2] = cvCloneImage(&(IplImage)tmp);
-	}
-	// min filter
-	for (int c = 0; c<3; ++c)
-		minfilt(vImg[c], vImg[c + 3], 5);
-
-	//max filter
-	for (int c = 0; c<3; ++c)
 		maxfilt(vImg[c], 5);
 
 
@@ -1151,54 +976,4 @@ void CRPatch::maxminfilt(uchar* data, uchar* maxvalues, uchar* minvalues, unsign
     maxvalues[size-d] = data[maxfifo.size()>0 ? maxfifo.front():size-step];
 	minvalues[size-d] = data[minfifo.size()>0 ? minfifo.front():size-step];
  
-}
-
-// helper function (maybe that goes somehow easier)
-void CRPatch::meshgrid(const cv::Mat &xgv, const cv::Mat &ygv, cv::Mat1i &X, cv::Mat1i &Y)
-{
-	repeat(xgv.reshape(1, 1), ygv.total(), 1, X);
-	repeat(ygv.reshape(1, 1).t(), 1, xgv.total(), Y);
-}
-
-void CRPatch::meshgridTest(const cv::Range &xgv, const cv::Range &ygv, cv::Mat1i &X, cv::Mat1i &Y)
-{
-	vector<int> t_x, t_y;
-	for (int i = xgv.start; i < xgv.end; i++) t_x.push_back(i);
-	for (int i = ygv.start; i < ygv.end; i++) t_y.push_back(i);
-	meshgrid(cv::Mat(t_x), cv::Mat(t_y), X, Y);
-}
-
-cv::Mat CRPatch::fixMat2GMM(cv::Mat& nmsmat, int sigma){
-	cv::Mat locations;   // output, locations of non-zero pixels 
-	findNonZero(nmsmat>0, locations);
-	vector<int> pnts;
-	vector<CvPoint> ps;
-	for (int i = 0; i < locations.rows; i++){
-		ps.push_back(locations.at<cv::Point>(i));
-		pnts.push_back(nmsmat.at<double>(ps[i].y, ps[i].x));
-	}
-	cv::Mat1i X, Y;
-	meshgridTest(cv::Range(0, nmsmat.cols), cv::Range(0, nmsmat.rows), X, Y);
-	cv::Mat GMM(nmsmat.rows, nmsmat.cols, CV_32F, cv::Scalar::all(0));
-	for (int i = 0; i < ps.size(); i++){
-		cv::Mat fg(nmsmat.rows, nmsmat.cols, CV_32F);
-		for (int j = 0; j < nmsmat.rows; j++){
-			for (int k = 0; k < nmsmat.cols; k++){
-				fg.at<float>(j, k) = exp(-((float(pow((Y.at<int>(j, k) - ps[i].y), 2)) / 2 / pow(sigma, 2)) + (float(pow((X.at<int>(j, k) - ps[i].x), 2)) / 2 / pow(sigma, 2))));
-			}
-		}
-		double mymin, mymax;
-		cv::minMaxLoc(fg, &mymin, &mymax);
-		if (mymax != 0){
-			fg = (pnts[i] * fg) / mymax;
-			GMM = GMM + fg;
-		}
-
-	}
-	double mymin, mymax;
-	cv::minMaxLoc(GMM, &mymin, &mymax);
-	if (mymax != 0){
-		GMM = GMM / mymax;
-	}
-	return GMM;
 }

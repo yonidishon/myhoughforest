@@ -10,14 +10,13 @@
 using namespace std;
 
 // DETECTORS
-void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect, std::vector<float>& ratios, const char* imfile , const char* exp_fold) {
+void CRForestDetector::detectColor(IplImage *img, vector<IplImage* >& imgDetect, std::vector<float>& ratios,const char* imfile) {
 
 	// extract features
 	vector<IplImage*> vImg;
 	//CRPatch::extractFeatureChannels(img, vImg);
 	//CRPatch::extractFeatureChannelsExtra(img, vImg, imfile); //vImg are features map size(Img)
-	//CRPatch::extractPCAChannels(img, vImg, imfile); //vImg are features map size(Img)
-	CRPatch::extractPCAChannelsPlusEstTest(img, vImg, imfile,exp_fold); //vImg are features map size(Img)
+	CRPatch::extractPCAChannels(img, vImg, imfile); //vImg are features map size(Img)
 
 	// reset output image
 	for(int c=0; c<(int)imgDetect.size(); ++c)
@@ -308,7 +307,7 @@ void CRForestDetector::detectColorcascade(PatchFeature& p, priority_queue<PatchF
 }
 
 // PYRAMIDS
-void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& vImgDetect, std::vector<float>& ratios, const char* imfile , const char* exp_fold) {
+void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& vImgDetect, std::vector<float>& ratios,const char* imfile) {	
 
 	if(img->nChannels==1) {
 
@@ -324,7 +323,7 @@ void CRForestDetector::detectPyramid(IplImage *img, vector<vector<IplImage*> >& 
 			cvResize( img, cLevel, CV_INTER_LINEAR );	
 
 			// detection
-			detectColor(cLevel,vImgDetect[i],ratios,imfile,exp_fold);
+			detectColor(cLevel,vImgDetect[i],ratios,imfile);
 
 			cvReleaseImage(&cLevel);
 		}

@@ -77,8 +77,6 @@ public:
 	// Extract features from image ( All Houghforest - and adding my PCAs and PCAm)
 	static void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
 	static void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
-	static void CRPatch::extractPCAChannelsPlusEst(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath);
-	static void CRPatch::extractPCAChannelsPlusEstTest(IplImage *img, std::vector<IplImage*>& vImg, const char* fullpath, const char* exp_fold);
 	// min/max filter
 	static void maxfilt(uchar* data, uchar* maxvalues, unsigned int step, unsigned int size, unsigned int width);
 	static void maxfilt(uchar* data, unsigned int step, unsigned int size, unsigned int width);
@@ -89,10 +87,6 @@ public:
 	static void maxfilt(IplImage *src, IplImage *dst, unsigned int width);
 	static void minfilt(IplImage *src, unsigned int width);
 	static void minfilt(IplImage *src, IplImage *dst, unsigned int width);
-	//Helper functions
-	static void meshgrid(const cv::Mat &xgv, const cv::Mat &ygv, cv::Mat1i &X, cv::Mat1i &Y);
-	static void meshgridTest(const cv::Range &xgv, const cv::Range &ygv, cv::Mat1i &X, cv::Mat1i &Y);
-	cv::Mat static fixMat2GMM(cv::Mat& nmsmat, int sigma = 15);
 
 	std::vector<std::vector<PatchFeature> > vLPatches;
 private:
