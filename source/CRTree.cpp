@@ -261,7 +261,7 @@ bool CRTree::optimizeTest(vector<vector<const PatchFeature*> >& SetA, vector<vec
 			generateTestAve(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, i);
 		}
 		else if (i >= TrainSet[1][0]->vPatch.size() && i < 2*(TrainSet[1][0]->vPatch.size())){ //first we choose test of patch mean - FOR ALL CHANNEL 
-			generateTestVar(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, i);
+			generateTestVar(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, i - TrainSet[1][0]->vPatch.size());
 		}
 		else{ 
 			generateTest(&tmpTest[0], TrainSet[1][0]->roi.width, TrainSet[1][0]->roi.height, TrainSet[1][0]->vPatch.size());
