@@ -5,6 +5,7 @@
 
 #include "CRPatch.h"
 #include <opencv2/highgui/highgui.hpp>
+#include <time.h>
 //#include <stdio.h>
 //#include <stdlib.h>
 #include <deque>
@@ -420,10 +421,12 @@ void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, co
 	// 0 channels: L, a, b, |I_x|, |I_y|, |I_xx|, |I_yy|, HOGlike features with 9 bins (weighted orientations 5x5 neighborhood)
 	// 2 channels : PCAm PCAs
 	// 2+2 channels: minfilter + maxfilter on 5x5 neighborhood 
-
+	
 	vImg.resize(4);
 	for (unsigned int c = 0; c<vImg.size(); ++c)
 		vImg[c] = cvCreateImage(cvSize(img->width, img->height), IPL_DEPTH_8U, 1);
+	
+	int tstart = clock();
 
 	// Get PCAm and PCAs Channel from saved images
 	string delimiter = ".";
@@ -440,7 +443,7 @@ void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, co
 
 	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
-
+	//cout << "Time for loading images : is (need to be decreased from total time): " << (double)(clock() - tstart) / CLOCKS_PER_SEC << endl;
 	// min filter
 	for (int c = 0; c<2; ++c)
 		minfilt(vImg[c], vImg[c + 2], 5);
@@ -448,6 +451,7 @@ void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, co
 	//max filter
 	for (int c = 0; c<2; ++c)
 		maxfilt(vImg[c], 5);
+	
 
 
 

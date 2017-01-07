@@ -386,8 +386,7 @@ void loadTrainPosFile(std::vector<string>& vFilenames, std::vector<CvRect>& vBBo
 			vBBox[i].height -= vBBox[i].y;
 
 			if(vBBox[i].width<p_width || vBBox[i].height<p_height) {
-			  cout << "Width or height are too small" << endl; 
-			  cout << vFilenames[i] << endl;
+				cout << vFilenames[i].c_str() << ":: Width or height are too small" << endl;
 			  exit(-1); 
 			}
 
@@ -433,8 +432,7 @@ void loadTrainPosFilesub(std::vector<string>& vFilenames, std::vector<CvRect>& v
 			vBBox[i].height -= vBBox[i].y;
 
 			if (vBBox[i].width<p_width || vBBox[i].height<p_height) {
-				cout << "Width or height are too small" << endl;
-				cout << vFilenames[i] << endl;
+				cout << vFilenames[i].c_str() << ":: Width or height are too small" << endl;
 				exit(-1);
 			}
 
@@ -484,8 +482,7 @@ void loadTrainNegFile(std::vector<string>& vFilenames, std::vector<CvRect>& vBBo
 				vBBox[i].height -= vBBox[i].y;
 
 				if(vBBox[i].width<p_width || vBBox[i].height<p_height) {
-				  cout << "Width or height are too small" << endl; 
-				  cout << vFilenames[i] << endl;
+				  cout << vFilenames[i].c_str() << ":: Width or height are too small" << endl;
 				  exit(-1); 
 				}
 
@@ -754,7 +751,8 @@ void extract_Patches(CRPatch& Train, CvRNG* pRNG) {
 			}
 
 			// Extract negative training patches
-			if (vBBox.size() == vFilenames.size()) {
+			if (0){
+			//if (vBBox.size() == vFilenames.size()) {
 				// checking if we have multiple lines corresponding to the same image. and increasing i
 				bool mul_im = false;
 				int j = i + 1;
@@ -953,10 +951,11 @@ void run_train() {
 			
 	// Extract training patches
 	extract_Patches(Train, &cvRNG); 
-
+	std::cout << "Finish extract_Patches" << std::endl;
 	// Train forest
 	crForest.trainForest(20, 15, &cvRNG, Train, 2000); //TODO change back to 20
 	//crForest.trainForest(1, 15, &cvRNG, Train, 2000);
+	std::cout << "Finish trainForest" << std::endl;
 
 	// Save forest
 	crForest.saveForest(treepath.c_str(), off_tree);
