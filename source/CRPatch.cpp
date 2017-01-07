@@ -379,8 +379,8 @@ void CRPatch::extractFeatureChannelsExtra(IplImage *img, std::vector<IplImage*>&
 	string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
 	string rootpath = path.substr(0, path.find_last_of("/\\'"));
 	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
-	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
-	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+	string fullpathPCAm = rootpath + "/\\" + "DIEMOFxOFyOFmGBVS/\\" + pfolder + "/\\" + fname + "_GBVS.png";
+	string fullpathPCAs = rootpath + "/\\" + "DIEMOFxOFyOFmGBVS/\\" + pfolder + "/\\" + fname + "_OFm.png";
 
 	vImg[16] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 	vImg[17] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
@@ -438,8 +438,8 @@ void CRPatch::extractPCAChannels(IplImage *img, std::vector<IplImage*>& vImg, co
 	string pfolder = path.substr(path.find_last_of("/\\'") + 1); //parent folder only
 	string rootpath = path.substr(0, path.find_last_of("/\\'"));
 	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
-	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
-	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+	string fullpathPCAm = rootpath + "/\\" + "DIEMOFxOFyOFmGBVS/\\" + pfolder + "/\\" + fname + "_GBVS.png";
+	string fullpathPCAs = rootpath + "/\\" + "DIEMOFxOFyOFmGBVS/\\" + pfolder + "/\\" + fname + "_OFm.png";
 
 	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
@@ -559,8 +559,8 @@ void CRPatch::extractFeatureChannelsPartial(IplImage *img, std::vector<IplImage*
 	string pfolder = path.substr(path.find_last_of("/\\'")+1); //parent folder only
 	string rootpath = path.substr(0, path.find_last_of("/\\'"));
 	rootpath = rootpath.substr(0, rootpath.find_last_of("/\\'"));
-	string fullpathPCAm = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAm.png";
-	string fullpathPCAs = rootpath + "/\\" + "DIEMPCApng/\\" + pfolder + "/\\" + fname + "_PCAs.png";
+	string fullpathPCAm = rootpath + "/\\" + "DIEMOFxOFyOFmGBVS/\\" + pfolder + "/\\" + fname + "_GBVS.png";
+	string fullpathPCAs = rootpath + "/\\" + "DIEMOFxOFyOFmGBVS/\\" + pfolder + "/\\" + fname + "_OFm.png";
 
 	vImg[0] = cvLoadImage(fullpathPCAm.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
 	vImg[1] = cvLoadImage(fullpathPCAs.c_str(), CV_LOAD_IMAGE_GRAYSCALE);
